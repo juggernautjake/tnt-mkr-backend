@@ -1,0 +1,46 @@
+{
+  "collectionName": "components_customization_engravings",
+  "info": {
+    "displayName": "engravings",
+    "icon": "brush",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "back_engraving_1_": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::engraving-option.engraving-option"
+    },
+    "back_engraving_2": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::engraving-option.engraving-option"
+    },
+    "back_engraving_3": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::engraving-option.engraving-option"
+    },
+    "right_side_engraving": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::engraving-option.engraving-option"
+    },
+    "left_side_engraving": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::engraving-option.engraving-option"
+    },
+    "top_engraving": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::engraving-option.engraving-option"
+    },
+    "bottom_engraving": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::engraving-option.engraving-option"
+    }
+  }
+}

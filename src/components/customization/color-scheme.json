@@ -1,0 +1,20 @@
+{
+  "collectionName": "components_customization_color_schemes",
+  "info": {
+    "displayName": "color scheme",
+    "icon": "brush"
+  },
+  "options": {},
+  "attributes": {
+    "primary_color": {
+      "type": "string",
+      "required": true
+    },
+    "secondary_color": {
+      "type": "string"
+    },
+    "tertiary_color": {
+      "type": "string"
+    }
+  }
+}

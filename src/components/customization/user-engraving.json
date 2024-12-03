@@ -1,0 +1,26 @@
+{
+  "collectionName": "components_customization_user_engravings",
+  "info": {
+    "displayName": "User Engraving",
+    "icon": "brush"
+  },
+  "options": {},
+  "attributes": {
+    "position": {
+      "type": "enumeration",
+      "enum": [
+        "back",
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "required": true
+    },
+    "engraving_option": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::engraving-option.engraving-option"
+    }
+  }
+}

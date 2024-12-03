@@ -1,0 +1,22 @@
+{
+  "collectionName": "components_customization_available_positions",
+  "info": {
+    "displayName": "available position",
+    "icon": "brush",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "available_positions": {
+      "type": "enumeration",
+      "enum": [
+        "back",
+        "right",
+        "left",
+        "top",
+        "bottom"
+      ],
+      "required": true
+    }
+  }
+}

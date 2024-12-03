@@ -1,0 +1,46 @@
+# backend/Dockerfile.dev
+
+FROM node:20.18.0-bullseye-slim AS builder
+
+# Install dependencies for sharp compatibility and other build tools
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gcc \
+    g++ \
+    make \
+    zlib1g-dev \
+    libvips-dev \
+    python3 \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set environment variables for sharp and Node.js
+ENV NODE_ENV=development
+ENV npm_config_platform=linux
+ENV npm_config_arch=x64
+ENV CI=true
+
+WORKDIR /opt/app
+
+# Copy package files and install dependencies
+COPY package.json yarn.lock ./
+RUN yarn config set network-timeout 600000 -g
+RUN yarn install
+
+# Copy application files
+COPY . .
+
+# Optionally, build TypeScript files if you have a build step
+# RUN yarn build
+
+# Set permissions for non-root user
+RUN chown -R node:node /opt/app
+
+# Switch to non-root user for security
+USER node
+
+# Expose the Strapi application port
+EXPOSE 1337
+
+# Start Strapi in development mode with hot reloading
+CMD ["yarn", "develop"]

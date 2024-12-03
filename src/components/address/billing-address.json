@@ -1,0 +1,25 @@
+{
+  "collectionName": "components_address_billing_addresses",
+  "info": {
+    "displayName": "billing_address",
+    "icon": "envelop"
+  },
+  "options": {},
+  "attributes": {
+    "street_address": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string"
+    },
+    "postal_code": {
+      "type": "string"
+    },
+    "country": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,125 @@
+{
+    "kind": "collectionType",
+    "collectionName": "up_users",
+    "info": {
+      "name": "user",
+      "description": "",
+      "singularName": "user",
+      "pluralName": "users",
+      "displayName": "User"
+    },
+    "options": {
+      "draftAndPublish": false
+    },
+    "attributes": {
+      "username": {
+        "type": "string",
+        "minLength": 3,
+        "unique": true,
+        "configurable": false,
+        "required": true
+      },
+      "email": {
+        "type": "email",
+        "minLength": 6,
+        "configurable": false,
+        "required": true
+      },
+      "provider": {
+        "type": "string",
+        "configurable": false
+      },
+      "password": {
+        "type": "password",
+        "minLength": 6,
+        "configurable": false,
+        "private": true,
+        "searchable": false
+      },
+      "resetPasswordToken": {
+        "type": "string",
+        "configurable": false,
+        "private": true,
+        "searchable": false
+      },
+      "confirmationToken": {
+        "type": "string",
+        "configurable": false,
+        "private": true,
+        "searchable": false
+      },
+      "confirmed": {
+        "type": "boolean",
+        "default": false,
+        "configurable": false
+      },
+      "blocked": {
+        "type": "boolean",
+        "default": false,
+        "configurable": false
+      },
+      "role": {
+        "type": "relation",
+        "relation": "manyToOne",
+        "target": "plugin::users-permissions.role",
+        "inversedBy": "users",
+        "configurable": false
+      },
+      "phone_number": {
+        "type": "string"
+      },
+      "billing_address": {
+        "displayName": "billing_address",
+        "type": "component",
+        "repeatable": false,
+        "component": "address.billing-address",
+        "required": true
+      },
+      "shipping_address": {
+        "displayName": "shipping_address",
+        "type": "component",
+        "repeatable": false,
+        "component": "address.shipping-address"
+      },
+      "email_confirmation": {
+        "type": "boolean"
+      },
+      "phone_confirmation": {
+        "type": "boolean"
+      },
+      "preferences": {
+        "type": "json"
+      },
+      "date_created_account": {
+        "type": "datetime"
+      },
+      "user_custom_cases": {
+        "type": "relation",
+        "relation": "oneToMany",
+        "target": "api::user-custom-case.user-custom-case",
+        "mappedBy": "user"
+      },
+      "first_name": {
+        "type": "string"
+      },
+      "last_name": {
+        "type": "string"
+      },
+      "orders": {
+        "type": "relation",
+        "relation": "oneToMany",
+        "target": "api::order.order",
+        "mappedBy": "user"
+      },
+      "cart": {
+        "type": "relation",
+        "relation": "oneToOne",
+        "target": "api::cart.cart",
+        "mappedBy": "user"
+      },
+      "account_creation": {
+        "type": "datetime"
+      }
+    }
+  }
+  

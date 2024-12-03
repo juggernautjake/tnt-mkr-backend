@@ -1,0 +1,38 @@
+{
+  "kind": "collectionType",
+  "collectionName": "engraving_options",
+  "info": {
+    "singularName": "engraving-option",
+    "pluralName": "engraving-options",
+    "displayName": "Engraving",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "description": {
+      "type": "blocks"
+    },
+    "image": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files"
+      ]
+    },
+    "available_positions": {
+      "type": "component",
+      "repeatable": true,
+      "component": "customization.available-position"
+    }
+  }
+}

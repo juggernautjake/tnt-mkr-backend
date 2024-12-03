@@ -1,0 +1,25 @@
+{
+  "collectionName": "components_address_shipping_addresses",
+  "info": {
+    "displayName": "shipping_address",
+    "icon": "envelop"
+  },
+  "options": {},
+  "attributes": {
+    "street_address": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string"
+    },
+    "postal_code": {
+      "type": "string"
+    },
+    "country": {
+      "type": "string"
+    }
+  }
+}

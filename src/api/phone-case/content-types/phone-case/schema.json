@@ -1,0 +1,113 @@
+{
+  "kind": "collectionType",
+  "collectionName": "phone_cases",
+  "info": {
+    "singularName": "phone-case",
+    "pluralName": "phone-cases",
+    "displayName": "Phone Case",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "description": {
+      "type": "blocks"
+    },
+    "price": {
+      "type": "decimal",
+      "min": 0
+    },
+    "three_d_model_file": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files"
+      ]
+    },
+    "material_1": {
+      "type": "string"
+    },
+    "material_2": {
+      "type": "string"
+    },
+    "dimensions": {
+      "type": "string"
+    },
+    "weight": {
+      "type": "decimal",
+      "min": 0
+    },
+    "thumbnail_image": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files"
+      ]
+    },
+    "case_image_files": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "units_in_stock": {
+      "type": "integer",
+      "required": true,
+      "min": 0
+    },
+    "units_sold": {
+      "type": "integer",
+      "required": false,
+      "min": 0
+    },
+    "customizable": {
+      "type": "boolean",
+      "default": false,
+      "required": true
+    },
+    "compatible_device": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::device.device",
+      "inversedBy": "phone_cases"
+    },
+    "base_case": {
+      "type": "string"
+    },
+    "color_scheme": {
+      "type": "component",
+      "repeatable": true,
+      "component": "customization.color-scheme"
+    },
+    "engravings": {
+      "displayName": "engravings",
+      "type": "component",
+      "repeatable": true,
+      "component": "customization.engravings"
+    },
+    "user_custom_cases": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::user-custom-case.user-custom-case",
+      "mappedBy": "base_case"
+    },
+    "is_base_case": {
+      "type": "boolean"
+    }
+  }
+}

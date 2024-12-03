@@ -1,0 +1,35 @@
+{
+  "kind": "collectionType",
+  "collectionName": "devices",
+  "info": {
+    "singularName": "device",
+    "pluralName": "devices",
+    "displayName": "Device",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "brand": {
+      "type": "string",
+      "required": true
+    },
+    "model": {
+      "type": "string",
+      "required": true
+    },
+    "dimensions": {
+      "type": "string",
+      "unique": false,
+      "regex": "\\d+(\\.\\d+)? x \\d+(\\.\\d+)? x \\d+(\\.\\d+)? mm$"
+    },
+    "phone_cases": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::phone-case.phone-case",
+      "mappedBy": "compatible_device"
+    }
+  }
+}
