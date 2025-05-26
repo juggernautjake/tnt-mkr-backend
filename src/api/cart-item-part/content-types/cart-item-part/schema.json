@@ -1,0 +1,30 @@
+{
+  "kind": "collectionType",
+  "collectionName": "cart_item_parts",
+  "info": {
+    "singularName": "cart-item-part",
+    "pluralName": "cart-item-parts",
+    "displayName": "Cart Item Part"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "cart_item": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::cart-item.cart-item",
+      "inversedBy": "cart_item_parts"
+    },
+    "product_part": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::product-part.product-part"
+    },
+    "color": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::color.color"
+    }
+  }
+}

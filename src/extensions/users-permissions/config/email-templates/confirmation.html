@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      background-color: #fefaf0; /* --background-light */
+      font-family: 'Roboto', sans-serif;
+      color: #333; /* --gray-900 */
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      color: #fe5100; /* --orange-500 */
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+    p {
+      margin: 10px 0;
+      font-size: 16px;
+    }
+    .button {
+      background-color: #fe5100; /* --orange-500 */
+      color: white;
+      padding: 10px 20px;
+      text-decoration: none;
+      border-radius: 5px;
+      display: inline-block;
+      font-weight: bold;
+    }
+    .button:hover {
+      background-color: #c85200; /* --orange-600 */
+    }
+    .footer {
+      margin-top: 20px;
+      font-size: 12px;
+      color: #555; /* --gray-800 */
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Welcome to TNT MKR!</h1>
+    <p>Hi {{ name }},</p>
+    <p>Thank you for registering. Please confirm your email address by clicking the button below:</p>
+    <a href="{{ confirmation_url }}" class="button">Confirm Email</a>
+    <p>If you did not create an account, please ignore this email.</p>
+    <div class="footer">
+      <p>© TNT MKR. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>

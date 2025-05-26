@@ -1,0 +1,38 @@
+{
+  "kind": "collectionType",
+  "collectionName": "webhook_events",
+  "info": {
+    "singularName": "webhook-event",
+    "pluralName": "webhook-events",
+    "displayName": "Webhook Event"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "event_id": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "event_type": {
+      "type": "string",
+      "required": true
+    },
+    "event_data": {
+      "type": "json"
+    },
+    "timestamp": {
+      "type": "datetime",
+      "required": true
+    },
+    "source": {
+      "type": "string",
+      "required": true
+    },
+    "processed": {
+      "type": "boolean",
+      "default": false
+    }
+  }
+}

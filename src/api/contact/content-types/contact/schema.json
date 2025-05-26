@@ -1,0 +1,40 @@
+{
+  "kind": "collectionType",
+  "collectionName": "contacts",
+  "info": {
+    "singularName": "contact",
+    "pluralName": "contacts",
+    "displayName": "Contact",
+    "description": "Stores customer support inquiries"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "email": {
+      "type": "email",
+      "required": true
+    },
+    "orderNumber": {
+      "type": "string"
+    },
+    "message": {
+      "type": "text",
+      "required": true
+    },
+    "submitted_at": {
+      "type": "datetime",
+      "required": true,
+      "default": "now()"
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["pending", "responded", "closed"],
+      "default": "pending"
+    }
+  }
+}

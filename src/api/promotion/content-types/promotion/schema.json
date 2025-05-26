@@ -1,0 +1,68 @@
+{
+  "kind": "collectionType",
+  "collectionName": "promotions",
+  "info": {
+    "singularName": "promotion",
+    "pluralName": "promotions",
+    "displayName": "Promotion"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "start_date": {
+      "type": "date",
+      "required": true
+    },
+    "end_date": {
+      "type": "date",
+      "required": true
+    },
+    "discount_percentage": {
+      "type": "decimal",
+      "min": 0,
+      "max": 100
+    },
+    "discount_amount": {
+      "type": "decimal",
+      "min": 0
+    },
+    "products": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::product.product",
+      "mappedBy": "promotions"
+    },
+    "discount_codes": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::discount-code.discount-code",
+      "mappedBy": "promotions"
+    },
+    "terms_and_conditions": {
+      "type": "text"
+    },
+    "promotion_type": {
+      "type": "enumeration",
+      "enum": ["summer_sale", "product_specific", "site_wide"],
+      "required": true
+    },
+    "promotion_images": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": ["images"]
+    },
+    "is_preorder": {
+      "type": "boolean",
+      "default": false
+    },
+    "description": {
+      "type": "text"
+    }
+  }
+}

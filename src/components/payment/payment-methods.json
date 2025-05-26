@@ -1,0 +1,31 @@
+{
+    "collectionName": "components_payment_payment_methods",
+    "info": {
+      "displayName": "Payment Methods",
+      "icon": "credit-card",
+      "description": "Stored payment methods for users"
+    },
+    "attributes": {
+      "provider": {
+        "type": "string",
+        "required": true
+      },
+      "last4": {
+        "type": "string",
+        "required": true
+      },
+      "expiry": {
+        "type": "string",
+        "required": true
+      },
+      "card_type": {
+        "type": "string",
+        "required": false
+      },
+      "payment_method_id": {
+        "type": "string",
+        "required": true
+      }
+    }
+  }
+  

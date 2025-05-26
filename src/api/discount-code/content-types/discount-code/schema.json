@@ -1,0 +1,60 @@
+{
+  "kind": "collectionType",
+  "collectionName": "discount_codes",
+  "info": {
+    "singularName": "discount-code",
+    "pluralName": "discount-codes",
+    "displayName": "Discount Code"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "code": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "discount_amount": {
+      "type": "decimal",
+      "required": false
+    },
+    "discount_percentage": {
+      "type": "integer",
+      "required": false,
+      "min": 0,
+      "max": 100
+    },
+    "products": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::product.product",
+      "inversedBy": "discount_codes"
+    },
+    "categories": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::category.category",
+      "inversedBy": "discount_codes"
+    },
+    "promotions": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::promotion.promotion",
+      "inversedBy": "discount_codes"
+    },
+    "valid_until": {
+      "type": "datetime"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    },
+    "orders": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::order.order",
+      "mappedBy": "discount_code"
+    }
+  }
+}

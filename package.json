@@ -1,0 +1,56 @@
+{
+  "name": "tnt-mkr-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A Strapi application",
+  "scripts": {
+    "build": "strapi build",
+    "heroku-postbuild": "strapi build",
+    "deploy": "strapi deploy",
+    "develop": "strapi develop",
+    "start": "strapi start",
+    "start:webhook": "ts-node webhook-server.ts",
+    "strapi": "strapi",
+    "ts:generate-types": "strapi ts:generate-types"
+  },
+  "dependencies": {
+    "@strapi/plugin-cloud": "^4.25.21",
+    "@strapi/plugin-users-permissions": "^4.25.21",
+    "@strapi/provider-email-mailgun": "^5.10.3",
+    "@strapi/provider-upload-cloudinary": "^5.10.3",
+    "@strapi/strapi": "^4.25.21",
+    "@swc/core": "^1.11.9",
+    "better-sqlite3": "^11.7.0",
+    "body-parser": "^2.2.0",
+    "cloudinary": "^2.5.1",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "handlebars": "^4.7.8",
+    "mailgun.js": "^10.2.4",
+    "node-fetch": "^2.6.7",
+    "pg": "^8.13.1",
+    "pg-connection-string": "^2.7.0",
+    "raw-body": "^3.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "react-router-dom": "5.3.4",
+    "redis": "^4.7.0",
+    "sqlite3": "^5.1.7",
+    "stripe": "^18.1.0",
+    "styled-components": "5.3.3"
+  },
+  "devDependencies": {
+    "@strapi/typescript-utils": "4.25.21",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.2"
+  },
+  "engines": {
+    "node": ">=20.0.0 <21"
+  },
+  "strapi": {
+    "uuid": "eaf74fec-959e-46b0-9580-3f5d4cbbd612"
+  }
+}

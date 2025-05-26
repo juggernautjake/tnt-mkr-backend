@@ -1,0 +1,44 @@
+{
+  "kind": "collectionType",
+  "collectionName": "colors",
+  "info": {
+    "singularName": "color",
+    "pluralName": "colors",
+    "displayName": "Color",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "hex_codes": {
+      "type": "json"
+    },
+    "type": {
+      "type": "enumeration",
+      "enum": ["standard", "metallic", "rainbow"]
+    },
+    "products": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::product.product",
+      "mappedBy": "colors"
+    },
+    "user_custom_cases": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::user-custom-case.user-custom-case",
+      "mappedBy": "selected_colors"
+    },
+    "product_parts": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::product-part.product-part",
+      "inversedBy": "colors"
+    }
+  }
+}

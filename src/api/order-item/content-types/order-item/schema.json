@@ -1,0 +1,57 @@
+{
+  "kind": "collectionType",
+  "collectionName": "order_items",
+  "info": {
+    "singularName": "order-item",
+    "pluralName": "order-items",
+    "displayName": "Order Item",
+    "description": "A line item in an order"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "product": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::product.product",
+      "required": true
+    },
+    "quantity": {
+      "type": "integer",
+      "min": 1,
+      "required": true
+    },
+    "price": {
+      "type": "decimal",
+      "required": true
+    },
+    "colors": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::color.color"
+    },
+    "engravings": {
+      "type": "component",
+      "repeatable": true,
+      "component": "customization.engraving"
+    },
+    "order": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::order.order",
+      "inversedBy": "order_items"
+    },
+    "order_item_parts": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::order-item-part.order-item-part",
+      "mappedBy": "order_item"
+    },
+    "promotions": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::promotion.promotion"
+    }
+  }
+}

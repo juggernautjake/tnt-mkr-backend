@@ -1,0 +1,114 @@
+{
+  "kind": "collectionType",
+  "collectionName": "products",
+  "info": {
+    "singularName": "product",
+    "pluralName": "products",
+    "displayName": "product",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "name": { "type": "string" },
+    "description": { "type": "text" },
+    "default_price": { "type": "decimal" },
+    "discounted_price": { "type": "decimal" },
+    "on_sale": { "type": "boolean" },
+    "product_parts": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::product-part.product-part",
+      "mappedBy": "product"
+    },
+    "materials": {
+      "type": "component",
+      "repeatable": true,
+      "component": "products.materials"
+    },
+    "dimensions": { "type": "string" },
+    "weight": { "type": "decimal" },
+    "thumbnail_image": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images", "files", "videos", "audios"]
+    },
+    "case_image_files": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": ["images", "files", "videos", "audios"]
+    },
+    "three_d_model_file": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": ["images", "files", "videos", "audios"]
+    },
+    "units_sold": { "type": "integer", "default": 0 },
+    "customizable": { "type": "boolean" },
+    "meta_title": { "type": "string" },
+    "meta_description": { "type": "text" },
+    "keywords": { "type": "string" },
+    "colors": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::color.color",
+      "inversedBy": "products"
+    },
+    "engraving_options": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::engraving-option.engraving-option",
+      "inversedBy": "products"
+    },
+    "reviews": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::review.review"
+    },
+    "device": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::device.device",
+      "inversedBy": "products",
+      "pluginOptions": { "content-manager": { "displayField": "model" } }
+    },
+    "user_custom_cases": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::user-custom-case.user-custom-case",
+      "mappedBy": "product"
+    },
+    "sku": { "type": "string", "unique": true },
+    "promotions": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::promotion.promotion",
+      "inversedBy": "products"
+    },
+    "star_rating": { "type": "decimal" },
+    "review_count": { "type": "integer" },
+    "wish_lists": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::wish-list.wish-list",
+      "mappedBy": "products"
+    },
+    "slug": { "type": "string", "unique": true },
+    "discount_codes": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::discount-code.discount-code",
+      "mappedBy": "products"
+    },
+    "categories": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::category.category",
+      "mappedBy": "products"
+    }
+  }
+}

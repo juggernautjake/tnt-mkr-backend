@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      background-color: #fefaf0;
+      font-family: 'Roboto', sans-serif;
+      color: #333;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.25);
+    }
+    h1 {
+      color: #fe5100;
+      font-size: 30px;
+      font-weight: bold;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    p {
+      margin: 10px 0;
+      font-size: 16px;
+    }
+    .intro-text {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .order-details {
+      border-top: 1px solid #ddd;
+      padding-top: 15px;
+      margin-bottom: 20px;
+    }
+    .order-details p {
+      margin: 8px 0;
+    }
+    .order-items {
+      margin-top: 20px;
+    }
+    .order-item {
+      border-bottom: 1px solid #ddd;
+      padding: 10px 0;
+    }
+    .item-name {
+      font-weight: bold;
+      color: #333;
+    }
+    .item-details {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 5px;
+    }
+    .customizations {
+      margin-top: 10px;
+    }
+    .customization {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 10px;
+    }
+    .color-bubble {
+      width: 30px;
+      height: 20px;
+      border-radius: 10px;
+      border: 2px solid black;
+    }
+    .promotions {
+      margin-top: 10px;
+    }
+    .button {
+      background-color: #fe5100;
+      color: white;
+      padding: 10px 20px;
+      text-decoration: none;
+      border-radius: 8px;
+      display: inline-block;
+      font-weight: bold;
+      margin-top: 20px;
+      text-align: center;
+    }
+    .button:hover {
+      background-color: #c85200;
+    }
+    .footer {
+      margin-top: 20px;
+      font-size: 12px;
+      color: #555;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Thank You for Your Order!</h1>
+    <p class="intro-text">
+      We’ve received your order and will begin processing it shortly.<br>
+      Please save the order confirmation information below.
+    </p>
+    <div class="order-details">
+      <p><strong>Order Number:</strong> {{ order_number }}</p>
+      <p><strong>Order Date:</strong> {{ ordered_at }}</p>
+      <p><strong>Total:</strong> ${{ total_amount }}</p>
+      <p><strong>Payment Method:</strong> ****-****-****-{{ payment_last_four }}</p>
+      <p><strong>Shipping to:</strong> {{ customer_name }} <br>
+        {{ shipping_address.street }}, {{ shipping_address.city }}, {{ shipping_address.state }} {{ shipping_address.postal_code }}, {{ shipping_address.country }}</p>
+      <p><strong>Billing Address:</strong> <br>
+        {{ billing_address.street }}, {{ billing_address.city }}, {{ billing_address.state }} {{ billing_address.postal_code }}, {{ billing_address.country }}</p>
+    </div>
+    <div class="order-items">
+      <h2 style="font-size: 20px; font-weight: bold; color: #333; margin-bottom: 10px;">Items Purchased</h2>
+      {{#order_items}}
+      <div class="order-item">
+        <div class="item-name">{{ product.name }}</div>
+        <div class="item-details">
+          <span>Price: ${{ price }}</span>
+          <span>Quantity: {{ quantity }}</span>
+        </div>
+        {{#order_item_parts}}
+        <div class="customization">
+          <span>{{ product_part.name }}: {{ color.name }}</span>
+          <div class="color-bubble" style="background: {{ color.hex_codes.0.hex_code }};"></div>
+        </div>
+        {{/order_item_parts}}
+        {{#promotions}}
+        <div class="promotions">
+          <h3 style="font-size: 18px; font-weight: bold; color: #333;">Promotions:</h3>
+          <p>{{ name }}</p>
+        </div>
+        {{/promotions}}
+      </div>
+      {{/order_items}}
+    </div>
+    <p>We’ll notify you when your order ships.</p>
+    <a href="{{ frontend_url }}" class="button">Visit Our Store</a>
+    <div class="footer">
+      <p>© TNT MKR. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>

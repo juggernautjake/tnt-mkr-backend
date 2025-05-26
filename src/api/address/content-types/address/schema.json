@@ -1,0 +1,59 @@
+{
+    "kind": "collectionType",
+    "collectionName": "addresses",
+    "info": {
+      "singularName": "address",
+      "pluralName": "addresses",
+      "displayName": "Address"
+    },
+    "options": {
+      "draftAndPublish": true
+    },
+    "attributes": {
+      "label": {
+        "type": "string"
+      },
+      "street": {
+        "type": "string",
+        "required": true
+      },
+      "city": {
+        "type": "string",
+        "required": true
+      },
+      "state": {
+        "type": "string"
+      },
+      "postal_code": {
+        "type": "string",
+        "required": true
+      },
+      "country": {
+        "type": "string",
+        "required": true,
+        "default": "USA"
+      },
+      "is_billing": {
+        "type": "boolean",
+        "default": false
+      },
+      "is_shipping": {
+        "type": "boolean",
+        "default": false
+      },
+      "is_default_billing": {
+        "type": "boolean",
+        "default": false
+      },
+      "is_default_shipping": {
+        "type": "boolean",
+        "default": false
+      },
+      "user": {
+        "type": "relation",
+        "relation": "manyToOne",
+        "target": "plugin::users-permissions.user"
+      }
+    }
+  }
+  

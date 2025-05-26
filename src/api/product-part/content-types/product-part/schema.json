@@ -1,0 +1,31 @@
+{
+  "kind": "collectionType",
+  "collectionName": "product_parts",
+  "info": {
+    "singularName": "product-part",
+    "pluralName": "product-parts",
+    "displayName": "Product Part"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "name": { "type": "string", "required": true },
+    "description": { "type": "text" },
+    "price": { "type": "decimal", "required": true },
+    "discounted_price": { "type": "decimal" },
+    "is_full_case": { "type": "boolean", "default": false },
+    "colors": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::color.color",
+      "mappedBy": "product_parts"
+    },
+    "product": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::product.product",
+      "inversedBy": "product_parts"
+    }
+  }
+}

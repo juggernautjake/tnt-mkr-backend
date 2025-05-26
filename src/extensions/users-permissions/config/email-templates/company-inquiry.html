@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      background-color: #fefaf0;
+      font-family: 'Roboto', sans-serif;
+      color: #333;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      color: #fe5100;
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+    p {
+      margin: 10px 0;
+      font-size: 16px;
+    }
+    .footer {
+      margin-top: 20px;
+      font-size: 12px;
+      color: #555;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>New Customer Inquiry</h1>
+    <p><strong>Name:</strong> {{ name }}</p>
+    <p><strong>Email:</strong> {{ email }}</p>
+    <p><strong>Order Number:</strong> {{ orderNumber }}</p>
+    <p><strong>Message:</strong> {{ message }}</p>
+    <div class="footer">
+      <p>© TNT MKR. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>

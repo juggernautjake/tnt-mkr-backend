@@ -1,0 +1,30 @@
+{
+    "kind": "collectionType",
+    "collectionName": "order_item_parts",
+    "info": {
+      "singularName": "order-item-part",
+      "pluralName": "order-item-parts",
+      "displayName": "Order Item Part"
+    },
+    "options": {
+      "draftAndPublish": true
+    },
+    "attributes": {
+      "order_item": {
+        "type": "relation",
+        "relation": "manyToOne",
+        "target": "api::order-item.order-item",
+        "inversedBy": "order_item_parts"
+      },
+      "product_part": {
+        "type": "relation",
+        "relation": "oneToOne",
+        "target": "api::product-part.product-part"
+      },
+      "color": {
+        "type": "relation",
+        "relation": "oneToOne",
+        "target": "api::color.color"
+      }
+    }
+  }

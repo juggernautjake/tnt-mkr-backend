@@ -1,0 +1,121 @@
+{
+  "kind": "collectionType",
+  "collectionName": "orders",
+  "info": {
+    "singularName": "order",
+    "pluralName": "orders",
+    "displayName": "Order",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "order_number": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "total_amount": {
+      "type": "decimal",
+      "required": true
+    },
+    "order_status": {
+      "type": "enumeration",
+      "enum": [
+        "pending",
+        "paid",
+        "shipped",
+        "delivered",
+        "canceled",
+        "returned"
+      ],
+      "default": "pending"
+    },
+    "payment_status": {
+      "type": "enumeration",
+      "enum": [
+        "pending",
+        "completed",
+        "failed"
+      ],
+      "default": "pending"
+    },
+    "discount_total": {
+      "type": "decimal"
+    },
+    "payment_intent_id": {
+      "type": "string"
+    },
+    "ordered_at": {
+      "type": "datetime",
+      "required": true
+    },
+    "customer_name": {
+      "type": "string",
+      "required": true
+    },
+    "customer_phone": {
+      "type": "string"
+    },
+    "payment_method": {
+      "type": "string"
+    },
+    "discount_code": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::discount-code.discount-code",
+      "inversedBy": "orders"
+    },
+    "shipping_method": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::shipping-option.shipping-option"
+    },
+    "tracking_number": {
+      "type": "string"
+    },
+    "order_items": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::order-item.order-item",
+      "mappedBy": "order"
+    },
+    "sales_tax": {
+      "type": "decimal"
+    },
+    "shipping_cost": {
+      "type": "decimal"
+    },
+    "subtotal": {
+      "type": "decimal",
+      "required": true
+    },
+    "transaction_fee": {
+      "type": "decimal",
+      "default": 0.50
+    },
+    "guest_email": {
+      "type": "email"
+    },
+    "user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "orders"
+    },
+    "shipping_address": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::address.address"
+    },
+    "billing_address": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::address.address"
+    },
+    "payment_last_four": {
+      "type": "string"
+    }
+  }
+}

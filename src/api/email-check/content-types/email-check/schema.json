@@ -1,0 +1,19 @@
+{
+    "kind": "collectionType",
+    "collectionName": "email_checks",
+    "info": {
+      "singularName": "email-check",
+      "pluralName": "email-checks",
+      "displayName": "EmailCheck",
+      "description": "Temporary collection for email existence checking"
+    },
+    "options": {
+      "draftAndPublish": false,
+      "timestamps": false
+    },
+    "attributes": {
+      "email": {
+        "type": "email"
+      }
+    }
+  }

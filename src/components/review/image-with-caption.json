@@ -1,0 +1,22 @@
+{
+    "collectionName": "components_review_image_with_captions",
+    "info": {
+      "displayName": "Image with Caption",
+      "icon": "picture"
+    },
+    "attributes": {
+      "image": {
+        "type": "media",
+        "multiple": false,
+        "required": true,
+        "allowedTypes": [
+          "images"
+        ]
+      },
+      "caption": {
+        "type": "string",
+        "required": true
+      }
+    }
+  }
+  

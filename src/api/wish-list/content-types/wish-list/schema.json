@@ -1,0 +1,37 @@
+{
+  "kind": "collectionType",
+  "collectionName": "wish_lists",
+  "info": {
+    "singularName": "wish-list",
+    "pluralName": "wish-lists",
+    "displayName": "Wish List",
+    "description": "A collection of wishlists for authenticated users."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "products": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::product.product",
+      "inversedBy": "wish_lists"
+    },
+    "user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "wish_lists",
+      "required": true
+    },
+    "name": {
+      "type": "string",
+      "required": true,
+      "default": "Default"
+    },
+    "date_created": {
+      "type": "datetime",
+      "default": "now()"
+    }
+  }
+}

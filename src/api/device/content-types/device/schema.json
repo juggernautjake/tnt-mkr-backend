@@ -1,0 +1,46 @@
+{
+  "kind": "collectionType",
+  "collectionName": "devices",
+  "info": {
+    "singularName": "device",
+    "pluralName": "devices",
+    "displayName": "Device",
+    "description": "Devices compatible with products"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "brand": {
+      "type": "string",
+      "required": true
+    },
+    "model": {
+      "type": "string",
+      "required": true
+    },
+    "dimensions": {
+      "type": "string"
+    },
+    "type": {
+      "type": "enumeration",
+      "enum": [
+        "phone",
+        "gaming_device",
+        "earbud_case"
+      ],
+      "required": true
+    },
+    "products": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::product.product",
+      "mappedBy": "device"
+    }
+  },
+  "pluginOptions": {
+    "content-manager": {
+      "displayField": "model"
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "collectionName": "components_customization_engravings",
+  "info": {
+    "displayName": "Engraving",
+    "icon": "pencil",
+    "description": "Engraving options for customization"
+  },
+  "attributes": {
+    "text": {
+      "type": "text",
+      "required": true
+    },
+    "position": {
+      "type": "enumeration",
+      "enum": [
+        "back",
+        "left",
+        "right",
+        "top",
+        "bottom"
+      ],
+      "required": true
+    },
+    "font": {
+      "type": "string",
+      "required": false
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "kind": "collectionType",
+  "collectionName": "cart_items",
+  "info": {
+    "singularName": "cart-item",
+    "pluralName": "cart-items",
+    "displayName": "Cart Item",
+    "description": "Individual line items in a shopping cart."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "cart": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::cart.cart",
+      "inversedBy": "cart_items"
+    },
+    "product": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::product.product"
+    },
+    "quantity": {
+      "type": "integer",
+      "min": 1,
+      "required": true
+    },
+    "price": {
+      "type": "decimal",
+      "required": true
+    },
+    "original_price": {
+      "type": "decimal"
+    },
+    "effective_price": {
+      "type": "decimal"
+    },
+    "cart_item_parts": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::cart-item-part.cart-item-part",
+      "mappedBy": "cart_item"
+    },
+    "engravings": {
+      "type": "component",
+      "repeatable": true,
+      "component": "customization.engraving"
+    },
+    "is_additional_part": {
+      "type": "boolean",
+      "default": false
+    }
+  }
+}

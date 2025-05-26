@@ -1,0 +1,55 @@
+{
+  "kind": "collectionType",
+  "collectionName": "user_custom_cases",
+  "info": {
+    "singularName": "user-custom-case",
+    "pluralName": "user-custom-cases",
+    "displayName": "User Custom Case",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "preview_model_file": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files"
+      ]
+    },
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "user_custom_cases"
+    },
+    "engravings": {
+      "type": "component",
+      "repeatable": true,
+      "component": "customization.engraving"
+    },
+    "selected_colors": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::color.color",
+      "inversedBy": "user_custom_cases"
+    },
+    "product": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::product.product",
+      "inversedBy": "user_custom_cases"
+    },
+    "public": {
+      "type": "boolean",
+      "default": false
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "kind": "collectionType",
+  "collectionName": "shipping_options",
+  "info": {
+    "singularName": "shipping-option",
+    "pluralName": "shipping-options",
+    "displayName": "Shipping Option",
+    "description": "Available shipping methods"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "baseCost": {
+      "type": "decimal",
+      "required": true
+    },
+    "costPerItem": {
+      "type": "decimal",
+      "required": true
+    },
+    "estimated_delivery": {
+      "type": "string",
+      "required": true
+    }
+  }
+}

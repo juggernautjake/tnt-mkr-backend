@@ -1,0 +1,18 @@
+{
+  "collectionName": "components_products_materials",
+  "info": {
+    "displayName": "Materials",
+    "icon": "cube",
+    "description": "Materials used in the product"
+  },
+  "attributes": {
+    "material_type": {
+      "type": "string",
+      "required": true
+    },
+    "material_description": {
+      "type": "text",
+      "required": false
+    }
+  }
+}
