@@ -1,4 +1,3 @@
-// C:\TNT-MKR\Website Stuff\Code Base\tnt-mkr-backend\config\middlewares.ts
 export default [
   'strapi::errors',
   {
@@ -24,7 +23,7 @@ export default [
   {
     name: 'strapi::cors',
     config: {
-      origin: ['http://localhost:3000'],
+      origin: ['https://www.tnt-mkr.com', 'https://tnt-mkr-frontend-cj5f.vercel.app'],
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       headers: ['Content-Type', 'Authorization'],
       credentials: true,

@@ -6,14 +6,8 @@ export default ({ env }) => {
   const connections = {
     postgres: {
       connection: {
-        connectionString:
-          env('NODE_ENV') === 'production'
-            ? env('HEROKU_DATABASE_URL')
-            : env('DATABASE_URL'),
-        ssl:
-          env('NODE_ENV') === 'production'
-            ? { rejectUnauthorized: false }
-            : false,
+        connectionString: env('DATABASE_URL'),
+        ssl: env('NODE_ENV') === 'production' ? { rejectUnauthorized: false } : false,
         schema: env('DATABASE_SCHEMA', 'public'),
       },
       pool: {
