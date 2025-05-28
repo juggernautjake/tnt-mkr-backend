@@ -91,7 +91,7 @@ export default factories.createCoreController("api::cart.cart", ({ strapi }) => 
             },
           });
 
-          if (!userId) ctx.cookies.set("session_id", guestSession, { httpOnly: true, sameSite: "lax" });
+          if (!userId) ctx.cookies.set("session_id", guestSession, { httpOnly: true, sameSite: "none", secure: true });
           return { data: newCart };
         }
 
@@ -226,7 +226,7 @@ export default factories.createCoreController("api::cart.cart", ({ strapi }) => 
         data: cartData,
         populate: ["cart_items"],
       });
-      if (!user) ctx.cookies.set("session_id", sessionId, { httpOnly: true, sameSite: "lax" });
+      if (!user) ctx.cookies.set("session_id", sessionId, { httpOnly: true, sameSite: "none", secure: true });
 
       return this.transformResponse(cart);
     } catch (error) {
@@ -279,6 +279,7 @@ export default factories.createCoreController("api::cart.cart", ({ strapi }) => 
             },
           },
         });
+        ctx.cookies.set("session_id", guestSession, { httpOnly: true, sameSite: "none", secure: true });
         return this.transformResponse(newCart);
       }
 
