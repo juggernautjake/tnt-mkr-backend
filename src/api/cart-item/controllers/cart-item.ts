@@ -41,7 +41,7 @@ export default factories.createCoreController('api::cart-item.cart-item', ({ str
   async create(ctx: any) {
     const { data } = ctx.request.body as { data: any };
     const user = ctx.state.user;
-    const sessionId = ctx.cookies.get('session_id');
+    const sessionId = ctx.request.headers['x-guest-session'];
 
     strapi.log.info(`[Cart Item Create] Received request with data: ${JSON.stringify(data)}`);
     strapi.log.debug(`[Cart Item Create] User: ${user ? user.id : 'None'}, Session ID: ${sessionId}`);
@@ -73,7 +73,6 @@ export default factories.createCoreController('api::cart-item.cart-item', ({ str
       populate: ['promotions'],
     });
 
-    // Validate the provided price against the effective price
     const effectivePrice = await calculateEffectivePrice(strapi, product);
     const providedPrice = parseFloat(data.price);
     if (Math.abs(providedPrice - effectivePrice) > 0.01) {
@@ -105,18 +104,16 @@ export default factories.createCoreController('api::cart-item.cart-item', ({ str
         strapi.log.info(`[Cart Item Create] Updated item: ${JSON.stringify(updatedItem)}`);
         return this.transformResponse(updatedItem);
       } else {
-        // Create new cart item
         const newItem = await strapi.entityService.create('api::cart-item.cart-item', {
           data: {
             cart: data.cart,
             product: data.product,
             quantity: data.quantity || 1,
-            price: effectivePrice.toFixed(2), // Use validated effective price
+            price: effectivePrice.toFixed(2),
           },
           populate: ['product'],
         });
 
-        // Create and publish cart_item_parts
         for (const cust of data.customizations || []) {
           await strapi.entityService.create('api::cart-item-part.cart-item-part', {
             data: {
@@ -128,7 +125,6 @@ export default factories.createCoreController('api::cart-item.cart-item', ({ str
           });
         }
 
-        // Fetch the complete cart item with populated data
         const completeItem = await strapi.entityService.findOne('api::cart-item.cart-item', newItem.id, {
           populate: ['product', 'cart_item_parts.product_part', 'cart_item_parts.color'],
         });
@@ -145,7 +141,7 @@ export default factories.createCoreController('api::cart-item.cart-item', ({ str
   async delete(ctx: any) {
     const { id } = ctx.params;
     const user = ctx.state.user;
-    const sessionId = ctx.cookies.get('session_id');
+    const sessionId = ctx.request.headers['x-guest-session'];
 
     const cartItem = await strapi.entityService.findOne('api::cart-item.cart-item', id, {
       populate: { cart: { populate: ['user'] } },

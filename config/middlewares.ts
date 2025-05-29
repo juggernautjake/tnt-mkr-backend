@@ -25,7 +25,7 @@ export default [
     config: {
       origin: ['https://www.tnt-mkr.com', 'https://tnt-mkr-frontend-cj5f.vercel.app'],
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      headers: ['Content-Type', 'Authorization'],
+      headers: ['Content-Type', 'Authorization', 'X-Guest-Session'], // Add custom header
       credentials: true,
     },
   },

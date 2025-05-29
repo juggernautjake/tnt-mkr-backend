@@ -43,7 +43,7 @@ export default factories.createCoreController("api::cart.cart", ({ strapi }) => 
   async find(ctx: Context) {
     const { active, filters = {} } = ctx.query as any;
     const userId = ctx.state.user?.id;
-    const guestSession = filters.guest_session || ctx.cookies.get("session_id") || crypto.randomUUID();
+    const guestSession = ctx.request.headers['x-guest-session'] || filters.guest_session || crypto.randomUUID();
 
     if (active === "true") {
       const queryFilters = userId
@@ -90,8 +90,6 @@ export default factories.createCoreController("api::cart.cart", ({ strapi }) => 
               },
             },
           });
-
-          if (!userId) ctx.cookies.set("session_id", guestSession, { httpOnly: true, sameSite: "none", secure: true });
           return { data: newCart };
         }
 
@@ -147,7 +145,7 @@ export default factories.createCoreController("api::cart.cart", ({ strapi }) => 
     const { id } = ctx.params as { id: string };
     const { data } = ctx.request.body as any;
     const user = ctx.state.user;
-    const sessionId = ctx.cookies.get("session_id");
+    const sessionId = ctx.request.headers['x-guest-session'];
 
     const cart = await strapi.entityService.findOne("api::cart.cart", id, {
       populate: ["user", "cart_items"],
@@ -197,7 +195,7 @@ export default factories.createCoreController("api::cart.cart", ({ strapi }) => 
   async create(ctx: Context) {
     const { data } = ctx.request.body as any || {};
     const { user } = ctx.state;
-    const sessionId = data.guest_session || ctx.cookies.get("session_id") || crypto.randomUUID();
+    const sessionId = data.guest_session || ctx.request.headers['x-guest-session'] || crypto.randomUUID();
 
     if (!data || typeof data !== "object") {
       return ctx.badRequest("Request body must contain a valid data object");
@@ -226,8 +224,6 @@ export default factories.createCoreController("api::cart.cart", ({ strapi }) => 
         data: cartData,
         populate: ["cart_items"],
       });
-      if (!user) ctx.cookies.set("session_id", sessionId, { httpOnly: true, sameSite: "none", secure: true });
-
       return this.transformResponse(cart);
     } catch (error) {
       strapi.log.error("Error in create cart:", error);
@@ -279,7 +275,6 @@ export default factories.createCoreController("api::cart.cart", ({ strapi }) => 
             },
           },
         });
-        ctx.cookies.set("session_id", guestSession, { httpOnly: true, sameSite: "none", secure: true });
         return this.transformResponse(newCart);
       }
 
