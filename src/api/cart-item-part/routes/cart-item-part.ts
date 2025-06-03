@@ -4,4 +4,8 @@
 
 import { factories } from '@strapi/strapi';
 
-export default factories.createCoreRouter('api::cart-item-part.cart-item-part');
+export default factories.createCoreRouter('api::cart-item-part.cart-item-part', {
+  config: {
+    create: { auth: false },
+  },
+});
