@@ -462,6 +462,7 @@ export interface ApiCartItemCartItem extends Schema.CollectionType {
     draftAndPublish: false;
   };
   attributes: {
+    base_price: Attribute.Decimal & Attribute.Required;
     cart: Attribute.Relation<
       'api::cart-item.cart-item',
       'manyToOne',
@@ -479,11 +480,10 @@ export interface ApiCartItemCartItem extends Schema.CollectionType {
       'admin::user'
     > &
       Attribute.Private;
-    effective_price: Attribute.Decimal;
+    effective_price: Attribute.Decimal & Attribute.Required;
     engravings: Attribute.Component<'customization.engraving', true>;
     is_additional_part: Attribute.Boolean & Attribute.DefaultTo<false>;
     original_price: Attribute.Decimal;
-    price: Attribute.Decimal & Attribute.Required;
     product: Attribute.Relation<
       'api::cart-item.cart-item',
       'manyToOne',
