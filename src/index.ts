@@ -28,9 +28,15 @@ export default {
             },
           });
           for (const cart of abandonedCarts) {
-            await strapi.entityService.deleteMany('api::cart-item.cart-item', {
-              filters: { cart: { id: { $eq: cart.id } } },
+            // Find all cart items associated with the cart
+            const cartItems = await strapi.entityService.findMany('api::cart-item.cart-item', {
+              filters: { cart: { id: cart.id } },
             });
+            // Delete each cart item individually
+            for (const item of cartItems) {
+              await strapi.entityService.delete('api::cart-item.cart-item', item.id);
+            }
+            // Delete the cart
             await strapi.entityService.delete('api::cart.cart', cart.id);
           }
           strapi.log.info(`Cleaned up ${abandonedCarts.length} abandoned guest carts`);
