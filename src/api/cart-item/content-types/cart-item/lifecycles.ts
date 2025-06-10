@@ -59,7 +59,7 @@ async function calculateEffectivePrice(strapi: any, productId: number): Promise<
     effectivePrice = product.discounted_price;
   }
 
-  return Number(effectivePrice.toFixed(2));
+  return effectivePrice; // Return as number
 }
 
 async function updateCartTotal(cartId: number) {
@@ -78,6 +78,6 @@ async function updateCartTotal(cartId: number) {
   }, Promise.resolve(0));
 
   await strapi.entityService.update('api::cart.cart', cartId, {
-    data: { total: total.toFixed(2) },
+    data: { total: Math.round(total * 100) / 100 }, // Keep as number, rounded to 2 decimal places
   });
 }

@@ -34,7 +34,8 @@ async function calculateEffectivePrice(strapi: any, product: any): Promise<numbe
   } else if (promotions.length === 0 && product.on_sale && product.discounted_price) {
     effectivePrice = product.discounted_price;
   }
-  return Number(effectivePrice.toFixed(2));
+  // Return as a number, no toFixed(2) or Number() needed
+  return effectivePrice;
 }
 
 export default factories.createCoreController('api::cart-item.cart-item', ({ strapi }) => ({
@@ -104,13 +105,18 @@ export default factories.createCoreController('api::cart-item.cart-item', ({ str
         strapi.log.info(`[Cart Item Create] Updated item: ${JSON.stringify(updatedItem)}`);
         return this.transformResponse(updatedItem);
       } else {
+        const basePrice = parseFloat(data.base_price);
+        // Round to 2 decimal places, keeping it a number
+        const roundedBasePrice = Math.round(basePrice * 100) / 100;
+        const roundedEffectivePrice = Math.round(effectivePrice * 100) / 100;
+
         const newItem = await strapi.entityService.create('api::cart-item.cart-item', {
           data: {
             cart: data.cart,
             product: data.product,
             quantity: data.quantity || 1,
-            base_price: parseFloat(data.base_price).toFixed(2),
-            effective_price: effectivePrice.toFixed(2),
+            base_price: roundedBasePrice,
+            effective_price: roundedEffectivePrice,
           },
           populate: ['product'],
         });
