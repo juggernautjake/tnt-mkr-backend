@@ -46,9 +46,9 @@ export default factories.createCoreController('api::cart-item.cart-item', ({ str
     strapi.log.info(`[Cart Item Create] Received request with data: ${JSON.stringify(data)}`);
     strapi.log.debug(`[Cart Item Create] User: ${user ? user.id : 'None'}, Session ID: ${sessionId}`);
 
-    if (!data || !data.cart || !data.product || !data.price) {
+    if (!data || !data.cart || !data.product || !data.base_price || !data.effective_price) {
       strapi.log.warn('[Cart Item Create] Missing required fields');
-      return ctx.badRequest('Cart ID, product, and price are required');
+      return ctx.badRequest('Cart ID, product, base_price, and effective_price are required');
     }
 
     const cart: any = await strapi.entityService.findOne('api::cart.cart', data.cart, {
@@ -74,10 +74,10 @@ export default factories.createCoreController('api::cart-item.cart-item', ({ str
     });
 
     const effectivePrice = await calculateEffectivePrice(strapi, product);
-    const providedPrice = parseFloat(data.price);
-    if (Math.abs(providedPrice - effectivePrice) > 0.01) {
-      strapi.log.warn(`[Cart Item Create] Price mismatch for product ${data.product}: provided=${providedPrice}, effective=${effectivePrice}`);
-      throw new ValidationError(`Invalid price: Provided price (${providedPrice}) does not match the effective price (${effectivePrice})`);
+    const providedEffectivePrice = parseFloat(data.effective_price);
+    if (Math.abs(providedEffectivePrice - effectivePrice) > 0.01) {
+      strapi.log.warn(`[Cart Item Create] Effective price mismatch for product ${data.product}: provided=${providedEffectivePrice}, calculated=${effectivePrice}`);
+      throw new ValidationError(`Invalid effective price: Provided (${providedEffectivePrice}) does not match calculated (${effectivePrice})`);
     }
 
     const cartItems = cart.cart_items || [];
@@ -109,7 +109,8 @@ export default factories.createCoreController('api::cart-item.cart-item', ({ str
             cart: data.cart,
             product: data.product,
             quantity: data.quantity || 1,
-            price: effectivePrice.toFixed(2),
+            base_price: parseFloat(data.base_price).toFixed(2),
+            effective_price: effectivePrice.toFixed(2),
           },
           populate: ['product'],
         });

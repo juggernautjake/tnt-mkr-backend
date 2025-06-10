@@ -27,15 +27,19 @@
       "min": 1,
       "required": true
     },
-    "price": {
+    "base_price": {
       "type": "decimal",
-      "required": true
+      "required": true,
+      "description": "The base price of the product before any discounts or promotions."
     },
     "original_price": {
-      "type": "decimal"
+      "type": "decimal",
+      "description": "The original price before any discounts, if applicable."
     },
     "effective_price": {
-      "type": "decimal"
+      "type": "decimal",
+      "required": true,
+      "description": "The final price after applying discounts or promotions."
     },
     "cart_item_parts": {
       "type": "relation",
