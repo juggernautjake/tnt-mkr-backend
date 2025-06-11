@@ -36,6 +36,7 @@
     "react-router-dom": "5.3.4",
     "redis": "^4.7.0",
     "sqlite3": "^5.1.7",
+    "strapi-plugin-rest-cache": "^4.2.9",
     "stripe": "^18.1.0",
     "styled-components": "5.3.3"
   },
