@@ -14,7 +14,7 @@ export default ({ env }) => {
         min: env.int('DATABASE_POOL_MIN', 2),
         max: env.int('DATABASE_POOL_MAX', 10),
       },
-      debug: true, // Enables SQL query logging to the console
+      debug: env('NODE_ENV') === 'production' ? false : true,  // Disable debug in production
     },
   };
 

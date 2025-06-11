@@ -1,4 +1,18 @@
 export default ({ env }) => ({
+  "rest-cache": {
+    enabled: true,
+    provider: {
+      name: "redis",
+      options: {
+        url: env("REDIS_URL"),
+      },
+    },
+    strategy: {
+      keysPrefix: "strapi_",
+      ttl: 300, // Cache for 5 minutes
+      contentTypes: ["api::product.product"],
+    },
+  },
   upload: {
     config: {
       provider: 'cloudinary',
