@@ -1,32 +1,18 @@
 import { factories } from '@strapi/strapi';
 
-// Function to calculate effective price based on active promotions
-async function calculateEffectivePrice(strapi: any, product: any): Promise<number> {
-  const currentDate = new Date().toISOString().split('T')[0];
-  
-  // Fetch active promotions for the product
-  const promotions = await strapi.db.query('api::promotion.promotion').findMany({
-    where: {
-      products: { id: product.id },
-      start_date: { $lte: currentDate },
-      end_date: { $gte: currentDate },
-      publishedAt: { $ne: null },
-    },
-  });
-
+// Calculate effective price using pre-fetched promotions
+function calculateEffectivePrice(product: any, promotions: any[]): number {
+  const productPromotions = promotions.filter(promo =>
+    promo.products.some(p => p.id === product.id)
+  );
   let effectivePrice = product.default_price;
   let maxDiscount = 0;
 
-  promotions.forEach((promotion: any) => {
-    let discount = 0;
-    if (promotion.discount_percentage) {
-      discount = product.default_price * (promotion.discount_percentage / 100);
-    } else if (promotion.discount_amount) {
-      discount = promotion.discount_amount;
-    }
-    if (discount > maxDiscount) {
-      maxDiscount = discount;
-    }
+  productPromotions.forEach(promo => {
+    const discount = promo.discount_percentage
+      ? product.default_price * (promo.discount_percentage / 100)
+      : promo.discount_amount || 0;
+    maxDiscount = Math.max(maxDiscount, discount);
   });
 
   if (maxDiscount > 0) {
@@ -38,22 +24,13 @@ async function calculateEffectivePrice(strapi: any, product: any): Promise<numbe
   return Number(effectivePrice.toFixed(2));
 }
 
-// Function to determine if the product is on sale and if it's a preorder sale
-async function getSaleDetails(strapi: any, product: any): Promise<{ on_sale: boolean; is_preorder_sale: boolean }> {
-  const currentDate = new Date().toISOString().split('T')[0];
-  
-  const promotions = await strapi.db.query('api::promotion.promotion').findMany({
-    where: {
-      products: { id: product.id },
-      start_date: { $lte: currentDate },
-      end_date: { $gte: currentDate },
-      publishedAt: { $ne: null },
-    },
-  });
-
-  const on_sale = promotions.length > 0 || (product.on_sale && product.discounted_price);
-  const is_preorder_sale = promotions.some((promo: any) => promo.is_preorder);
-
+// Determine sale details using pre-fetched promotions
+function getSaleDetails(product: any, promotions: any[]): { on_sale: boolean; is_preorder_sale: boolean } {
+  const productPromotions = promotions.filter(promo =>
+    promo.products.some(p => p.id === product.id)
+  );
+  const on_sale = productPromotions.length > 0 || (product.on_sale && product.discounted_price);
+  const is_preorder_sale = productPromotions.some(promo => promo.is_preorder);
   return { on_sale, is_preorder_sale };
 }
 
@@ -61,7 +38,6 @@ export default factories.createCoreController('api::product.product', ({ strapi 
   async find(ctx: any) {
     const { query } = ctx;
     const populate = query.populate ? query.populate.split(',') : ['thumbnail_image', 'colors', 'promotions'];
-    
     if (!populate.includes('promotions')) {
       populate.push('promotions');
     }
@@ -72,16 +48,28 @@ export default factories.createCoreController('api::product.product', ({ strapi 
       populate,
     });
 
-    const enhancedEntities = await Promise.all(entities.map(async (entity: any) => {
-      const { on_sale, is_preorder_sale } = await getSaleDetails(strapi, entity);
-      const effective_price = await calculateEffectivePrice(strapi, entity);
+    // Batch fetch all active promotions once
+    const currentDate = new Date().toISOString().split('T')[0];
+    const promotions = await strapi.db.query('api::promotion.promotion').findMany({
+      where: {
+        start_date: { $lte: currentDate },
+        end_date: { $gte: currentDate },
+        publishedAt: { $ne: null },
+      },
+      populate: ['products'],
+    });
+
+    // Enhance entities with calculated fields
+    const enhancedEntities = entities.map(entity => {
+      const effective_price = calculateEffectivePrice(entity, promotions);
+      const { on_sale, is_preorder_sale } = getSaleDetails(entity, promotions);
       return {
         ...entity,
         effective_price,
         on_sale,
         is_preorder_sale,
       };
-    }));
+    });
 
     return this.sanitizeOutput(enhancedEntities, ctx);
   },
@@ -90,18 +78,31 @@ export default factories.createCoreController('api::product.product', ({ strapi 
     const { id } = ctx.params;
     const { query } = ctx;
     const populate = query.populate ? query.populate.split(',') : ['thumbnail_image', 'colors', 'promotions'];
-    
     if (!populate.includes('promotions')) {
       populate.push('promotions');
     }
 
-    const entity = await strapi.entityService.findOne('api::product.product', id, { ...query, populate });
+    const entity = await strapi.entityService.findOne('api::product.product', id, {
+      ...query,
+      populate,
+    });
     if (!entity || !entity.publishedAt) {
       return ctx.notFound('Product not found');
     }
 
-    const { on_sale, is_preorder_sale } = await getSaleDetails(strapi, entity);
-    const effective_price = await calculateEffectivePrice(strapi, entity);
+    // Batch fetch all active promotions once
+    const currentDate = new Date().toISOString().split('T')[0];
+    const promotions = await strapi.db.query('api::promotion.promotion').findMany({
+      where: {
+        start_date: { $lte: currentDate },
+        end_date: { $gte: currentDate },
+        publishedAt: { $ne: null },
+      },
+      populate: ['products'],
+    });
+
+    const effective_price = calculateEffectivePrice(entity, promotions);
+    const { on_sale, is_preorder_sale } = getSaleDetails(entity, promotions);
     const enhancedEntity = {
       ...entity,
       effective_price,

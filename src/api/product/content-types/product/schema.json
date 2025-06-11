@@ -15,6 +15,7 @@
     "description": { "type": "text" },
     "default_price": { "type": "decimal" },
     "discounted_price": { "type": "decimal" },
+    "effective_price": { "type": "decimal" },
     "on_sale": { "type": "boolean" },
     "product_parts": {
       "type": "relation",
