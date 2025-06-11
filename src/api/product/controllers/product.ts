@@ -36,80 +36,92 @@ function getSaleDetails(product: any, promotions: any[]): { on_sale: boolean; is
 
 export default factories.createCoreController('api::product.product', ({ strapi }) => ({
   async find(ctx: any) {
-    const { query } = ctx;
-    const populate = query.populate ? query.populate.split(',') : ['thumbnail_image', 'colors', 'promotions'];
-    if (!populate.includes('promotions')) {
-      populate.push('promotions');
+    try {
+      const { query } = ctx;
+      const populate = query.populate ? query.populate.split(',') : ['thumbnail_image', 'colors', 'promotions'];
+      if (!populate.includes('promotions')) {
+        populate.push('promotions');
+      }
+
+      const entities = await strapi.entityService.findMany('api::product.product', {
+        ...query,
+        filters: { ...query.filters, publishedAt: { $ne: null } },
+        populate,
+      });
+
+      // Batch fetch all active promotions once
+      const currentDate = new Date().toISOString().split('T')[0];
+      const promotions = await strapi.db.query('api::promotion.promotion').findMany({
+        where: {
+          start_date: { $lte: currentDate },
+          end_date: { $gte: currentDate },
+          publishedAt: { $ne: null },
+        },
+        populate: ['products'],
+      });
+
+      // Enhance entities with calculated fields
+      const enhancedEntities = entities.map(entity => {
+        const effective_price = calculateEffectivePrice(entity, promotions);
+        const { on_sale, is_preorder_sale } = getSaleDetails(entity, promotions);
+        return {
+          ...entity,
+          effective_price,
+          on_sale,
+          is_preorder_sale,
+        };
+      });
+
+      return this.sanitizeOutput(enhancedEntities, ctx);
+    } catch (error) {
+      console.error('Error in product find method:', error);
+      ctx.status = 500;
+      return { error: { status: 500, name: 'InternalServerError', message: 'Failed to fetch products', details: error.message } };
     }
+  },
 
-    const entities = await strapi.entityService.findMany('api::product.product', {
-      ...query,
-      filters: { ...query.filters, publishedAt: { $ne: null } },
-      populate,
-    });
+  async findOne(ctx: any) {
+    try {
+      const { id } = ctx.params;
+      const { query } = ctx;
+      const populate = query.populate ? query.populate.split(',') : ['thumbnail_image', 'colors', 'promotions'];
+      if (!populate.includes('promotions')) {
+        populate.push('promotions');
+      }
 
-    // Batch fetch all active promotions once
-    const currentDate = new Date().toISOString().split('T')[0];
-    const promotions = await strapi.db.query('api::promotion.promotion').findMany({
-      where: {
-        start_date: { $lte: currentDate },
-        end_date: { $gte: currentDate },
-        publishedAt: { $ne: null },
-      },
-      populate: ['products'],
-    });
+      const entity = await strapi.entityService.findOne('api::product.product', id, {
+        ...query,
+        populate,
+      });
+      if (!entity || !entity.publishedAt) {
+        return ctx.notFound('Product not found');
+      }
 
-    // Enhance entities with calculated fields
-    const enhancedEntities = entities.map(entity => {
+      // Batch fetch all active promotions once
+      const currentDate = new Date().toISOString().split('T')[0];
+      const promotions = await strapi.db.query('api::promotion.promotion').findMany({
+        where: {
+          start_date: { $lte: currentDate },
+          end_date: { $gte: currentDate },
+          publishedAt: { $ne: null },
+        },
+        populate: ['products'],
+      });
+
       const effective_price = calculateEffectivePrice(entity, promotions);
       const { on_sale, is_preorder_sale } = getSaleDetails(entity, promotions);
-      return {
+      const enhancedEntity = {
         ...entity,
         effective_price,
         on_sale,
         is_preorder_sale,
       };
-    });
 
-    return this.sanitizeOutput(enhancedEntities, ctx);
-  },
-
-  async findOne(ctx: any) {
-    const { id } = ctx.params;
-    const { query } = ctx;
-    const populate = query.populate ? query.populate.split(',') : ['thumbnail_image', 'colors', 'promotions'];
-    if (!populate.includes('promotions')) {
-      populate.push('promotions');
+      return this.sanitizeOutput(enhancedEntity, ctx);
+    } catch (error) {
+      console.error('Error in product findOne method:', error);
+      ctx.status = 500;
+      return { error: { status: 500, name: 'InternalServerError', message: 'Failed to fetch product', details: error.message } };
     }
-
-    const entity = await strapi.entityService.findOne('api::product.product', id, {
-      ...query,
-      populate,
-    });
-    if (!entity || !entity.publishedAt) {
-      return ctx.notFound('Product not found');
-    }
-
-    // Batch fetch all active promotions once
-    const currentDate = new Date().toISOString().split('T')[0];
-    const promotions = await strapi.db.query('api::promotion.promotion').findMany({
-      where: {
-        start_date: { $lte: currentDate },
-        end_date: { $gte: currentDate },
-        publishedAt: { $ne: null },
-      },
-      populate: ['products'],
-    });
-
-    const effective_price = calculateEffectivePrice(entity, promotions);
-    const { on_sale, is_preorder_sale } = getSaleDetails(entity, promotions);
-    const enhancedEntity = {
-      ...entity,
-      effective_price,
-      on_sale,
-      is_preorder_sale,
-    };
-
-    return this.sanitizeOutput(enhancedEntity, ctx);
   },
 }));
