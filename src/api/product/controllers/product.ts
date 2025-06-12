@@ -43,10 +43,15 @@ export default factories.createCoreController('api::product.product', ({ strapi 
         populate.push('promotions');
       }
 
-      // Define fields to fetch from the database, excluding is_preorder_sale
-      const fields = query.fields
-        ? query.fields.split(',').filter((field: string) => field !== 'is_preorder_sale')
-        : ['id', 'name', 'default_price', 'effective_price', 'slug', 'on_sale'];
+      // Handle fields as either a string or an object
+      let fields: string[] = [];
+      if (typeof query.fields === 'string') {
+        fields = query.fields.split(',').filter((field: string) => field !== 'is_preorder_sale');
+      } else if (query.fields && typeof query.fields === 'object') {
+        fields = Object.values(query.fields).filter((field: string) => field !== 'is_preorder_sale');
+      } else {
+        fields = ['id', 'name', 'default_price', 'effective_price', 'slug', 'on_sale'];
+      }
 
       const entities = await strapi.entityService.findMany('api::product.product', {
         ...query,
@@ -95,10 +100,15 @@ export default factories.createCoreController('api::product.product', ({ strapi 
         populate.push('promotions');
       }
 
-      // Define fields to fetch from the database, excluding is_preorder_sale
-      const fields = query.fields
-        ? query.fields.split(',').filter((field: string) => field !== 'is_preorder_sale')
-        : ['id', 'name', 'default_price', 'effective_price', 'slug', 'on_sale'];
+      // Handle fields as either a string or an object
+      let fields: string[] = [];
+      if (typeof query.fields === 'string') {
+        fields = query.fields.split(',').filter((field: string) => field !== 'is_preorder_sale');
+      } else if (query.fields && typeof query.fields === 'object') {
+        fields = Object.values(query.fields).filter((field: string) => field !== 'is_preorder_sale');
+      } else {
+        fields = ['id', 'name', 'default_price', 'effective_price', 'slug', 'on_sale'];
+      }
 
       const entity = await strapi.entityService.findOne('api::product.product', id, {
         ...query,
