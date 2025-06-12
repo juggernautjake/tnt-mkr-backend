@@ -7,6 +7,7 @@ export default (): RedisClientType => {
     socket: {
       tls: true, // Enable TLS for secure connection
       rejectUnauthorized: false, // Allow self-signed certificates
+      keepAlive: 1000, // Keep the connection alive with a ping every 1 second
       reconnectStrategy: (retries) => {
         if (retries > 10) {
           console.error('Too many reconnection attempts. Giving up.');
