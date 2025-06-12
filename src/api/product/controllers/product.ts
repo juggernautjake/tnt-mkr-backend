@@ -43,8 +43,14 @@ export default factories.createCoreController('api::product.product', ({ strapi 
         populate.push('promotions');
       }
 
+      // Define fields to fetch from the database, excluding is_preorder_sale
+      const fields = query.fields
+        ? query.fields.split(',').filter((field: string) => field !== 'is_preorder_sale')
+        : ['id', 'name', 'default_price', 'effective_price', 'slug', 'on_sale'];
+
       const entities = await strapi.entityService.findMany('api::product.product', {
         ...query,
+        fields,
         filters: { ...query.filters, publishedAt: { $ne: null } },
         populate,
       });
@@ -68,7 +74,7 @@ export default factories.createCoreController('api::product.product', ({ strapi 
           ...entity,
           effective_price,
           on_sale,
-          is_preorder_sale,
+          is_preorder_sale, // Calculated, not fetched directly
         };
       });
 
@@ -89,8 +95,14 @@ export default factories.createCoreController('api::product.product', ({ strapi 
         populate.push('promotions');
       }
 
+      // Define fields to fetch from the database, excluding is_preorder_sale
+      const fields = query.fields
+        ? query.fields.split(',').filter((field: string) => field !== 'is_preorder_sale')
+        : ['id', 'name', 'default_price', 'effective_price', 'slug', 'on_sale'];
+
       const entity = await strapi.entityService.findOne('api::product.product', id, {
         ...query,
+        fields,
         populate,
       });
       if (!entity || !entity.publishedAt) {
@@ -114,7 +126,7 @@ export default factories.createCoreController('api::product.product', ({ strapi 
         ...entity,
         effective_price,
         on_sale,
-        is_preorder_sale,
+        is_preorder_sale, // Calculated based on promotions
       };
 
       return this.sanitizeOutput(enhancedEntity, ctx);

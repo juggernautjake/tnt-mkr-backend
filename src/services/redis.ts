@@ -5,6 +5,8 @@ export default (): RedisClientType => {
   const client = createClient({
     url: process.env.REDIS_URL || 'redis://localhost:6379',
     socket: {
+      tls: true, // Enable TLS for secure connection
+      rejectUnauthorized: false, // Allow self-signed certificates
       reconnectStrategy: (retries) => {
         if (retries > 10) {
           console.error('Too many reconnection attempts. Giving up.');
