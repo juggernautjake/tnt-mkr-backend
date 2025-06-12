@@ -1,5 +1,17 @@
 import { factories } from '@strapi/strapi';
 
+// Utility function to normalize fields input
+function normalizeFields(fieldsInput: any): string[] {
+  if (typeof fieldsInput === 'string') {
+    return fieldsInput.split(',').filter(field => field !== 'is_preorder_sale');
+  } else if (fieldsInput && typeof fieldsInput === 'object') {
+    return Object.values(fieldsInput)
+      .filter((field: any) => typeof field === 'string' && field !== 'is_preorder_sale') as string[];
+  } else {
+    return ['id', 'name', 'default_price', 'effective_price', 'slug', 'on_sale'];
+  }
+}
+
 // Calculate effective price using pre-fetched promotions
 function calculateEffectivePrice(product: any, promotions: any[]): number {
   const productPromotions = promotions.filter(promo =>
@@ -43,15 +55,8 @@ export default factories.createCoreController('api::product.product', ({ strapi 
         populate.push('promotions');
       }
 
-      // Handle fields as either a string or an object
-      let fields: string[] = [];
-      if (typeof query.fields === 'string') {
-        fields = query.fields.split(',').filter((field: string) => field !== 'is_preorder_sale');
-      } else if (query.fields && typeof query.fields === 'object') {
-        fields = Object.values(query.fields).filter((field: string) => field !== 'is_preorder_sale');
-      } else {
-        fields = ['id', 'name', 'default_price', 'effective_price', 'slug', 'on_sale'];
-      }
+      // Use the utility function to get fields
+      const fields = normalizeFields(query.fields);
 
       const entities = await strapi.entityService.findMany('api::product.product', {
         ...query,
@@ -100,15 +105,8 @@ export default factories.createCoreController('api::product.product', ({ strapi 
         populate.push('promotions');
       }
 
-      // Handle fields as either a string or an object
-      let fields: string[] = [];
-      if (typeof query.fields === 'string') {
-        fields = query.fields.split(',').filter((field: string) => field !== 'is_preorder_sale');
-      } else if (query.fields && typeof query.fields === 'object') {
-        fields = Object.values(query.fields).filter((field: string) => field !== 'is_preorder_sale');
-      } else {
-        fields = ['id', 'name', 'default_price', 'effective_price', 'slug', 'on_sale'];
-      }
+      // Use the utility function to get fields
+      const fields = normalizeFields(query.fields);
 
       const entity = await strapi.entityService.findOne('api::product.product', id, {
         ...query,
