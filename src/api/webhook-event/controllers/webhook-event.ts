@@ -9,7 +9,7 @@ export default factories.createCoreController('api::webhook-event.webhook-event'
   async create(ctx) {
     // Capture the raw request body
     let rawBody = '';
-    await new Promise((resolve) => {
+    await new Promise<void>((resolve) => {
       ctx.req.setEncoding('utf8');
       ctx.req.on('data', (chunk) => {
         rawBody += chunk;
@@ -51,7 +51,7 @@ export default factories.createCoreController('api::webhook-event.webhook-event'
         data: {
           event_id,
           event_type,
-          event_data,
+          event_data: event_data as any, // Cast to any to resolve type mismatch
           timestamp,
           source,
           processed: false,

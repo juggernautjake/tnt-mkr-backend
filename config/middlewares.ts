@@ -8,6 +8,14 @@ export default [
             provider: 'redis',
             providerOptions: {
               url: process.env.REDIS_URL,
+              socket: {
+                reconnectStrategy: (retries) => {
+                  if (retries > 10) {
+                    return new Error('Too many reconnection attempts');
+                  }
+                  return 1000; // Reconnect after 1 second
+                },
+              },
             },
           }
         : {},

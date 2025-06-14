@@ -5,6 +5,14 @@ export default ({ env }) => ({
       name: "redis",
       options: {
         url: env("REDIS_URL"),
+        socket: {
+          reconnectStrategy: (retries) => {
+            if (retries > 10) {
+              return new Error('Too many reconnection attempts');
+            }
+            return 1000; // Reconnect after 1 second
+          },
+        },
       },
     },
     strategy: {
