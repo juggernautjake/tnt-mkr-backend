@@ -6,7 +6,13 @@ import { v4 as uuidv4 } from 'uuid';
 
 const { ApplicationError, ValidationError, NotFoundError } = errors;
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
+// Ensure STRIPE_SECRET_KEY is set
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+if (!stripeSecretKey) {
+  throw new Error('STRIPE_SECRET_KEY is not set in the environment variables');
+}
+
+const stripe = new Stripe(stripeSecretKey, {
   apiVersion: '2025-04-30.basil',
 });
 
