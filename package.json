@@ -19,7 +19,7 @@
     "@strapi/provider-email-mailgun": "^5.10.3",
     "@strapi/provider-upload-cloudinary": "^5.10.3",
     "@strapi/strapi": "^4.25.21",
-    "@swc/core": "^1.11.9",
+    "@swc/core": "^1.7.26",
     "better-sqlite3": "^11.7.0",
     "body-parser": "^2.2.0",
     "cloudinary": "^2.5.1",
