@@ -31,9 +31,9 @@ export default [
   {
     name: 'strapi::cors',
     config: {
-      origin: ['https://www.tnt-mkr.com', 'https://tnt-mkr-frontend-cj5f.vercel.app'],
+      origin: ['https://www.tnt-mkr.com'], // Removed Vercel preview URL
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      headers: ['Content-Type', 'Authorization', 'X-Guest-Session'], // Add custom header
+      headers: ['Content-Type', 'Authorization', 'X-Guest-Session'],
       credentials: true,
     },
   },
