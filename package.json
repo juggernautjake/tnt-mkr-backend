@@ -19,6 +19,7 @@
     "@strapi/provider-email-mailgun": "^5.10.3",
     "@strapi/provider-upload-cloudinary": "^5.10.3",
     "@strapi/strapi": "^4.25.21",
+    "@strapi/typescript-utils": "4.25.21",
     "@swc/core": "^1.7.26",
     "better-sqlite3": "^11.7.0",
     "body-parser": "^2.2.0",
@@ -41,7 +42,6 @@
     "styled-components": "5.3.3"
   },
   "devDependencies": {
-    "@strapi/typescript-utils": "4.25.21",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
