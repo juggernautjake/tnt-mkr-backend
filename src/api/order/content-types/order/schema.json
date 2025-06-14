@@ -17,8 +17,9 @@
       "unique": true
     },
     "total_amount": {
-      "type": "decimal",
-      "required": true
+      "type": "integer",
+      "required": true,
+      "description": "Total amount in cents"
     },
     "order_status": {
       "type": "enumeration",
@@ -42,7 +43,8 @@
       "default": "pending"
     },
     "discount_total": {
-      "type": "decimal"
+      "type": "integer",
+      "description": "Discount total in cents"
     },
     "payment_intent_id": {
       "type": "string"
@@ -82,18 +84,22 @@
       "mappedBy": "order"
     },
     "sales_tax": {
-      "type": "decimal"
+      "type": "integer",
+      "description": "Sales tax in cents"
     },
     "shipping_cost": {
-      "type": "decimal"
+      "type": "integer",
+      "description": "Shipping cost in cents"
     },
     "subtotal": {
-      "type": "decimal",
-      "required": true
+      "type": "integer",
+      "required": true,
+      "description": "Subtotal in cents"
     },
     "transaction_fee": {
-      "type": "decimal",
-      "default": 0.50
+      "type": "integer",
+      "default": 50,
+      "description": "Transaction fee in cents"
     },
     "guest_email": {
       "type": "email"

@@ -46,16 +46,16 @@ interface OrderInput {
   ordered_at: Date;
   customer_name: string;
   customer_phone: string;
-  total_amount: number;
+  total_amount: number; // In cents
   order_status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'canceled' | 'returned';
   payment_status: 'pending' | 'completed' | 'failed';
   shipping_address: number;
   billing_address: number;
-  subtotal: string;
-  shipping_cost: string;
-  sales_tax: string;
-  transaction_fee: string;
-  discount_total: string;
+  subtotal: number; // In cents
+  shipping_cost: number; // In cents
+  sales_tax: number; // In cents
+  transaction_fee: number; // In cents
+  discount_total: number; // In cents
   payment_last_four: string;
 }
 
@@ -117,7 +117,7 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
         return {
           product: item.product.id,
           quantity: item.quantity,
-          price: parseFloat(item.price),
+          price: Math.round(parseFloat(item.price) * 100), // Convert price to cents
           engravings: item.engravings || [],
           colors: item.colors?.map((color) => color.id) || [],
           promotions: activePromotions.map((promo: any) => promo.id),
@@ -126,7 +126,7 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
       strapi.log.debug(`[Order Controller] Prepared order items: ${JSON.stringify(orderItemsData)}`);
 
       const subtotalCents = orderItemsData.reduce(
-        (sum: number, item: OrderItemInput) => sum + Math.round(item.price * 100) * item.quantity,
+        (sum: number, item: OrderItemInput) => sum + item.price * item.quantity,
         0
       );
       const totalItems = orderItemsData.reduce((sum: number, item: OrderItemInput) => sum + item.quantity, 0);
@@ -135,11 +135,11 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
       const shippingCents = baseCostCents + costPerItemCents * (totalItems - 1);
       const taxRate = process.env.TAX_RATE ? parseFloat(process.env.TAX_RATE) : 0.0825;
       const taxCents = Math.round(subtotalCents * taxRate);
-      const transactionFeeCents = 50;
+      const transactionFeeCents = 50; // Fixed at 50 cents
       const discountsCents = 0;
       const calculatedTotalCents = subtotalCents + shippingCents + taxCents + transactionFeeCents - discountsCents;
 
-      const totalFromFrontendCents = Number(data.total_amount);
+      const totalFromFrontendCents = Number(data.total_amount); // Already in cents from frontend
       if (Math.abs(totalFromFrontendCents - calculatedTotalCents) > 1) {
         strapi.log.error(`[Order Controller] Total mismatch. Expected ${calculatedTotalCents} cents, received ${totalFromFrontendCents} cents`);
         throw new ValidationError(
@@ -180,16 +180,16 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
         ordered_at: new Date(),
         customer_name: data.customer_name || user?.username || '',
         customer_phone: data.customer_phone || user?.phone || '',
-        total_amount: calculatedTotalCents,
+        total_amount: calculatedTotalCents, // Stored in cents
         order_status: 'pending',
         payment_status: 'pending',
         shipping_address: shippingAddressId,
         billing_address: billingAddressId,
-        subtotal: (subtotalCents / 100).toFixed(2),
-        shipping_cost: (shippingCents / 100).toFixed(2),
-        sales_tax: (taxCents / 100).toFixed(2),
-        transaction_fee: (transactionFeeCents / 100).toFixed(2),
-        discount_total: (discountsCents / 100).toFixed(2),
+        subtotal: subtotalCents, // Stored in cents
+        shipping_cost: shippingCents, // Stored in cents
+        sales_tax: taxCents, // Stored in cents
+        transaction_fee: transactionFeeCents, // Stored in cents
+        discount_total: discountsCents, // Stored in cents
         payment_last_four: '',
       };
 
@@ -204,7 +204,7 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
             order: order.id,
             product: item.product,
             quantity: item.quantity,
-            price: item.price,
+            price: item.price / 100, // Convert back to dollars for order-item schema if needed
             colors: item.colors,
             engravings: item.engravings,
             promotions: item.promotions,
@@ -237,7 +237,7 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
 
       if (data.paymentMethod === 'stripe') {
         const paymentIntent = await stripe.paymentIntents.create({
-          amount: calculatedTotalCents,
+          amount: calculatedTotalCents, // Amount in cents for Stripe
           currency: 'usd',
           metadata: { order_id: order.id, order_number: order.order_number },
         });
@@ -247,7 +247,7 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
         });
 
         await strapi.entityService.update('api::cart.cart', data.cartId, {
-          data: { cart_items: [], total: '0.00', status: 'converted' },
+          data: { cart_items: [], total: 0, status: 'converted' }, // Total in cents
         });
 
         let newGuestSession: string | null = user ? null : uuidv4();
@@ -264,7 +264,7 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
         }
 
         const newCartData = {
-          total: '0.00',
+          total: 0, // In cents
           status: 'active' as const,
           user: user ? user.id : null,
           guest_session: newGuestSession,

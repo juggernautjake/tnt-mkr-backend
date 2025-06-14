@@ -3,19 +3,19 @@ import { factories } from '@strapi/strapi';
 interface OrderData {
   order_items: { product: number; quantity: number; price: number }[];
   shipping_method: number | { id: number };
-  subtotal: number;
-  shipping_cost: number;
-  sales_tax: number;
-  transaction_fee: number;
-  discount_total: number;
+  subtotal: number; // In cents
+  shipping_cost: number; // In cents
+  sales_tax: number; // In cents
+  transaction_fee: number; // In cents
+  discount_total: number; // In cents
 }
 
 export default factories.createCoreService('api::order.order', ({ strapi }) => ({
   async calculateTotal(order: OrderData): Promise<number> {
     const subtotalCents = order.order_items.reduce(
       (sum: number, item: { product: number; quantity: number; price: number }) => {
-        const itemTotal = Math.round(Number(item.price) * 100) * item.quantity;
-        strapi.log.debug(`[Order Service] Item total: ${item.price} * ${item.quantity} = ${itemTotal} cents`);
+        const itemTotal = item.price * item.quantity; // Price already in cents
+        strapi.log.debug(`[Order Service] Item total: ${item.price} cents * ${item.quantity} = ${itemTotal} cents`);
         return sum + itemTotal;
       },
       0
@@ -40,8 +40,8 @@ export default factories.createCoreService('api::order.order', ({ strapi }) => (
     const taxCents = Math.round(subtotalCents * taxRate);
     strapi.log.debug(`[Order Service] Tax: ${subtotalCents} * ${taxRate} = ${taxCents} cents`);
 
-    const transactionFeeCents = Math.round(Number(order.transaction_fee) * 100);
-    const discountsCents = Math.round(Number(order.discount_total) * 100);
+    const transactionFeeCents = order.transaction_fee; // Already in cents
+    const discountsCents = order.discount_total; // Already in cents
 
     const totalCents = subtotalCents + shippingCents + taxCents + transactionFeeCents - discountsCents;
     strapi.log.debug(`[Order Service] Total: ${totalCents} cents (subtotal=${subtotalCents}, shipping=${shippingCents}, tax=${taxCents}, fee=${transactionFeeCents}, discount=${discountsCents})`);
