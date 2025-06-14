@@ -8,7 +8,7 @@
     "heroku-postbuild": "strapi ts:generate-types && strapi build",
     "deploy": "strapi deploy",
     "develop": "strapi develop",
-    "start": "strapi start",
+    "start": "node dist/server.js",
     "start:webhook": "ts-node webhook-server.ts",
     "strapi": "strapi",
     "ts:generate-types": "strapi ts:generate-types"
