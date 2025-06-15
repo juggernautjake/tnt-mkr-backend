@@ -58,16 +58,17 @@ export default factories.createCoreController('api::webhook-event.webhook-event'
         },
       });
 
-      // Process the webhook event (e.g., update order status, send email)
-      await strapi.service('api::webhook-event.webhook-event').processWebhookEvent(webhookEvent);
+      // Respond immediately to Stripe
+      ctx.body = { received: true };
 
-      // Mark the event as processed
-      await strapi.entityService.update('api::webhook-event.webhook-event', webhookEvent.id, {
-        data: { processed: true },
+      // Process the event asynchronously
+      setImmediate(() => {
+        strapi.service('api::webhook-event.webhook-event').processWebhookEvent(webhookEvent).catch((error) => {
+          strapi.log.error(`Failed to process webhook event ${webhookEvent.event_id}: ${error.message}`);
+        });
       });
 
-      strapi.log.info(`Webhook event ${webhookEvent.event_id} fully processed`);
-      return webhookEvent;
+      return;
     } catch (error) {
       strapi.log.error(`Webhook processing failed: ${error.message}`);
       return ctx.badRequest('Webhook processing failed', { error: error.message });
