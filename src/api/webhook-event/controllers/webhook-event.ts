@@ -7,33 +7,26 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 
 export default factories.createCoreController('api::webhook-event.webhook-event', ({ strapi }) => ({
   async create(ctx) {
-    // Capture the raw request body for Stripe verification
-    let rawBody = '';
-    await new Promise<void>((resolve) => {
-      ctx.req.setEncoding('utf8');
-      ctx.req.on('data', (chunk) => {
-        rawBody += chunk;
-      });
-      ctx.req.on('end', () => {
-        resolve();
-      });
-    });
+    const rawBody = ctx.request.rawBody;
+    if (!rawBody) {
+      strapi.log.error('Missing raw body in webhook request');
+      return ctx.badRequest('Missing raw body');
+    }
 
-    // Get the Stripe signature from the headers
     const signature = ctx.request.headers['stripe-signature'];
     if (!signature) {
-      strapi.log.error('Missing Stripe signature');
+      strapi.log.error('Missing Stripe-Signature header');
       return ctx.badRequest('Missing Stripe signature');
     }
 
     try {
-      // Verify the event
+      strapi.log.info('Verifying Stripe webhook signature');
       const event = stripe.webhooks.constructEvent(rawBody, signature, process.env.STRIPE_WEBHOOK_SECRET);
       strapi.log.info(`Webhook event received: ${event.id} (${event.type})`);
 
       const event_id = event.id;
       const event_type = event.type;
-      const event_data = event.data.object;
+      const event_data = event.data.object as any;
       const timestamp = new Date(event.created * 1000).toISOString();
       const source = 'stripe';
 
@@ -43,6 +36,7 @@ export default factories.createCoreController('api::webhook-event.webhook-event'
       });
       if (existingEvent) {
         strapi.log.info(`Duplicate webhook event ${event_id} detected; acknowledging but not reprocessing`);
+        ctx.status = 200;
         ctx.body = { received: true };
         return;
       }
@@ -60,10 +54,11 @@ export default factories.createCoreController('api::webhook-event.webhook-event'
       });
 
       // Respond to Stripe immediately
+      ctx.status = 200;
       ctx.body = { received: true };
       strapi.log.info(`Acknowledged webhook event ${event_id} to Stripe`);
 
-      // Process the event asynchronously
+      // Process asynchronously
       setImmediate(async () => {
         try {
           await strapi.service('api::webhook-event.webhook-event').processWebhookEvent(webhookEvent);
@@ -72,14 +67,14 @@ export default factories.createCoreController('api::webhook-event.webhook-event'
           });
           strapi.log.info(`Webhook event ${event_id} processed successfully`);
         } catch (error) {
-          strapi.log.error(`Failed to process webhook event ${event_id}: ${error.message}`);
+          strapi.log.error(`Failed to process webhook event ${event_id}: ${(error as Error).message}`);
         }
       });
 
       return;
     } catch (error) {
-      strapi.log.error(`Webhook verification failed: ${error.message}`);
-      return ctx.badRequest('Webhook verification failed', { error: error.message });
+      strapi.log.error(`Webhook verification failed: ${(error as Error).message}`);
+      return ctx.badRequest('Webhook verification failed', { error: (error as Error).message });
     }
   },
 }));

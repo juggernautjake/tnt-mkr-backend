@@ -1,5 +1,6 @@
 export default [
   'strapi::errors',
+  'global::rawBody', // New middleware to capture raw body
   {
     name: 'strapi::session',
     config:
@@ -17,6 +18,8 @@ export default [
                 },
               },
             },
+            // Bypass session for webhook endpoint
+            exclude: ['/api/webhook-events'],
           }
         : {},
   },
@@ -31,9 +34,9 @@ export default [
   {
     name: 'strapi::cors',
     config: {
-      origin: ['https://www.tnt-mkr.com'], // Removed Vercel preview URL
+      origin: ['https://www.tnt-mkr.com'],
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      headers: ['Content-Type', 'Authorization', 'X-Guest-Session'],
+      headers: ['Content-Type', 'Authorization', 'X-Guest-Session', 'Stripe-Signature'], 
       credentials: true,
     },
   },
