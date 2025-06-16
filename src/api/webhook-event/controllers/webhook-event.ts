@@ -7,7 +7,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 
 export default factories.createCoreController('api::webhook-event.webhook-event', ({ strapi }) => ({
   async create(ctx) {
-    const rawBody = ctx.request.rawBody;
+    const unparsedSymbol = Symbol.for('unparsedBody');
+    const rawBody = ctx.request.body[unparsedSymbol];
     if (!rawBody) {
       strapi.log.error('Missing raw body in webhook request');
       return ctx.badRequest('Missing raw body');
@@ -30,7 +31,6 @@ export default factories.createCoreController('api::webhook-event.webhook-event'
       const timestamp = new Date(event.created * 1000).toISOString();
       const source = 'stripe';
 
-      // Check for duplicate events
       const existingEvent = await strapi.db.query('api::webhook-event.webhook-event').findOne({
         where: { event_id },
       });
@@ -41,7 +41,6 @@ export default factories.createCoreController('api::webhook-event.webhook-event'
         return;
       }
 
-      // Store the event with processed: false
       const webhookEvent = await strapi.entityService.create('api::webhook-event.webhook-event', {
         data: {
           event_id,
@@ -53,12 +52,10 @@ export default factories.createCoreController('api::webhook-event.webhook-event'
         },
       });
 
-      // Respond to Stripe immediately
       ctx.status = 200;
       ctx.body = { received: true };
       strapi.log.info(`Acknowledged webhook event ${event_id} to Stripe`);
 
-      // Process asynchronously
       setImmediate(async () => {
         try {
           await strapi.service('api::webhook-event.webhook-event').processWebhookEvent(webhookEvent);

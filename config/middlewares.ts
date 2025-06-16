@@ -1,6 +1,11 @@
 export default [
   'strapi::errors',
-  'global::rawBody', // Must come before strapi::body to capture raw body first
+  {
+    name: 'strapi::body',
+    config: {
+      includeUnparsed: true,
+    },
+  },
   {
     name: 'strapi::session',
     config:
@@ -14,23 +19,15 @@ export default [
                   if (retries > 10) {
                     return new Error('Too many reconnection attempts');
                   }
-                  return 1000; // Reconnect after 1 second
+                  return 1000;
                 },
               },
             },
-            exclude: ['/api/webhook-events'], // Bypass session for webhook
+            exclude: ['/api/webhook-events'],
           }
         : {},
   },
   'strapi::query',
-  {
-    name: 'strapi::body',
-    config: {
-      // Explicitly exclude webhook endpoint from body parsing
-      include: [], // Only parse body for specified routes (optional)
-      exclude: ['/api/webhook-events'], // Ensure no parsing for webhooks
-    },
-  },
   {
     name: 'strapi::logger',
     config: {
