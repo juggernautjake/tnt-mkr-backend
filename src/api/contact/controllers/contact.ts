@@ -1,3 +1,4 @@
+// C:\TNT-MKR\tnt-mkr-backend\src\api\contact\controllers\contact.ts
 import { factories } from '@strapi/strapi';
 import Handlebars from 'handlebars';
 
@@ -142,7 +143,7 @@ export default factories.createCoreController('api::contact.contact', ({ strapi 
 
       await strapi.plugins['email'].services.email.send({
         to: contact.email,
-        from: process.env.DEFAULT_FROM_EMAIL || 'no-reply@tnt-mkr.com',
+        from: 'TNT MKR <no-reply@tnt-mkr.com>', // Explicitly set to override defaults if needed
         subject: 'We’ve Received Your Request',
         html: customerHtml,
       });
@@ -157,13 +158,13 @@ export default factories.createCoreController('api::contact.contact', ({ strapi 
       });
 
       await strapi.plugins['email'].services.email.send({
-        to: 'jacobmaddux@tnt-mkr.com',
-        from: process.env.DEFAULT_FROM_EMAIL || 'no-reply@tnt-mkr.com',
+        to: 'customer-service@tnt-mkr.com', // Updated to custom address
+        from: 'TNT MKR <no-reply@tnt-mkr.com>', // Explicitly set
         subject: 'New Customer Inquiry',
         html: companyHtml,
       });
 
-      strapi.log.info(`[Contact Controller] Emails sent to ${contact.email} and jacobmaddux@tnt-mkr.com`);
+      strapi.log.info(`[Contact Controller] Emails sent to ${contact.email} and customer-service@tnt-mkr.com`);
       return ctx.created({ message: 'Contact request submitted successfully', data: contact });
     } catch (error) {
       strapi.log.error('[Contact Controller] Error in create:', error);
