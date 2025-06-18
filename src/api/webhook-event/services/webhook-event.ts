@@ -1,3 +1,4 @@
+// C:\TNT-MKR\tnt-mkr-backend\src\api\webhook-event\services\webhook-event.ts
 import { factories } from '@strapi/strapi';
 import Stripe from 'stripe';
 import Handlebars from 'handlebars';
@@ -246,6 +247,7 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
     try {
       await strapi.plugins['email'].services.email.send({
         to: customerEmail,
+        from: 'TNT MKR <no-reply@tnt-mkr.com>', // Custom sender
         subject: 'Order Confirmation - TNT-MKR',
         html,
       });
