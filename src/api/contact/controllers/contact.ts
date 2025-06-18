@@ -34,54 +34,61 @@ export default factories.createCoreController('api::contact.contact', ({ strapi 
 
       // Customer email HTML template
       const customerHtmlTemplate = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <style>
-            body {
-              background-color: #fefaf0;
-              font-family: 'Roboto', sans-serif;
-              color: #333;
-              margin: 0;
-              padding: 20px;
-            }
-            .container {
-              max-width: 600px;
-              margin: 0 auto;
-              background-color: white;
-              padding: 20px;
-              border-radius: 8px;
-              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            }
-            h1 {
-              color: #fe5100;
-              font-size: 24px;
-              margin-bottom: 20px;
-            }
-            p {
-              margin: 10px 0;
-              font-size: 16px;
-            }
-            .footer {
-              margin-top: 20px;
-              font-size: 12px;
-              color: #555;
-              text-align: center;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h1>We’ve Received Your Request</h1>
-            <p>Hi {{ name }},</p>
-            <p><strong>Your message:</strong> {{ message }}</p>
-            <p>We’ll respond within 2 business days.</p>
-            <div class="footer">
-              <p>© TNT MKR. All rights reserved.</p>
-            </div>
-          </div>
-        </body>
-        </html>
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      background-color: #fefaf0;
+      font-family: 'Roboto', sans-serif;
+      color: #333;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      color: #fe5100;
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+    p {
+      margin: 10px 0;
+      font-size: 16px;
+    }
+    .footer {
+      margin-top: 20px;
+      font-size: 12px;
+      color: #555;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Thank You for Contacting TNT MKR!</h1>
+    <p>Dear {{ name }},</p>
+    <p>Thank you for reaching out to us. We have received your message and will do our best to respond within 2 business days.</p>
+    {{#if orderNumber}}
+    <p><strong>Order Number:</strong> {{ orderNumber }}</p>
+    {{/if}}
+    <p><strong>Your Message:</strong></p>
+    <p>{{ message }}</p>
+    <p>If you have any additional questions or need further assistance, please feel free to reply to this email.</p>
+    <p>Best regards,<br>
+    The TNT MKR Team</p>
+    <div class="footer">
+      <p>© TNT MKR. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
       `;
 
       // Company email HTML template
@@ -139,7 +146,11 @@ export default factories.createCoreController('api::contact.contact', ({ strapi 
 
       // Compile and render customer email
       const compiledCustomerTemplate = Handlebars.compile(customerHtmlTemplate);
-      const customerHtml = compiledCustomerTemplate({ name: contact.name, message: contact.message });
+      const customerHtml = compiledCustomerTemplate({
+        name: contact.name,
+        message: contact.message,
+        orderNumber: contact.orderNumber,
+      });
 
       await strapi.plugins['email'].services.email.send({
         to: contact.email,
