@@ -104,7 +104,6 @@ export default factories.createCoreController("api::cart.cart", ({ strapi }) => 
         cart.total = Number(total.toFixed(2));
         return { data: cart };
       } catch (error) {
-        strapi.log.error("Error fetching or creating active cart:", error);
         throw new ApplicationError("Failed to fetch or create active cart", { cause: error });
       }
     } else {
@@ -170,7 +169,6 @@ export default factories.createCoreController("api::cart.cart", ({ strapi }) => 
         data.total = "0.00";
         delete data.clearItems;
       } catch (error) {
-        strapi.log.error('[Cart Update] Error clearing items:', error);
         throw new ApplicationError('Failed to clear cart items', { cause: error });
       }
     }
@@ -226,7 +224,6 @@ export default factories.createCoreController("api::cart.cart", ({ strapi }) => 
       });
       return this.transformResponse(cart);
     } catch (error) {
-      strapi.log.error("Error in create cart:", error);
       throw new ApplicationError("Failed to create cart", { cause: error });
     }
   },
@@ -289,7 +286,6 @@ export default factories.createCoreController("api::cart.cart", ({ strapi }) => 
       cart.total = Number(total.toFixed(2));
       return this.transformResponse(cart);
     } catch (error) {
-      strapi.log.error("Error fetching guest cart:", error);
       throw new ApplicationError("Failed to fetch guest cart", { cause: error });
     }
   },

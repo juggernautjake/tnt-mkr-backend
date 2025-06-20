@@ -31,7 +31,7 @@ export default [
   {
     name: 'strapi::logger',
     config: {
-      level: 'debug',
+      level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
     },
   },
   {
@@ -49,4 +49,11 @@ export default [
   'strapi::responses',
   'strapi::favicon',
   'strapi::public',
+  {
+    name: 'global::rateLimit',
+    config: {
+      interval: 60000, // 1 minute
+      max: 100, // 100 requests per minute
+    },
+  },
 ];

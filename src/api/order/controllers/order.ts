@@ -63,10 +63,8 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
   async create(ctx: Context) {
     const { data } = ctx.request.body as { data: any };
     const { user } = ctx.state;
-    strapi.log.debug(`[Order Controller] Create order started with data: ${JSON.stringify(data)}`);
 
     if (!data.cartId || !data.shippingMethodId || !data.paymentMethod) {
-      strapi.log.error('[Order Controller] Missing required fields');
       throw new ValidationError('cartId, shippingMethodId, and paymentMethod are required');
     }
 
@@ -86,14 +84,10 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
         },
       }) as any;
 
-      strapi.log.debug(`[Order Controller] Fetched cart: ${JSON.stringify(cart)}`);
-
       if (!cart || (cart.user && user && cart.user.id !== user.id) || (!user && !cart.guest_session)) {
-        strapi.log.error('[Order Controller] Cart not found or unauthorized');
         throw new NotFoundError('Cart not found or does not belong to you');
       }
       if (cart.cart_items.length === 0) {
-        strapi.log.error('[Order Controller] Cart is empty');
         throw new ValidationError('No items to order');
       }
 
@@ -101,10 +95,8 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
         fields: ['baseCost', 'costPerItem'],
       });
       if (!shippingMethod) {
-        strapi.log.error(`[Order Controller] Invalid shippingMethodId: ${data.shippingMethodId}`);
         throw new ValidationError('Invalid shippingMethodId');
       }
-      strapi.log.debug(`[Order Controller] Shipping method: ${JSON.stringify(shippingMethod)}`);
 
       const currentDate = new Date().toISOString().split('T')[0];
       const orderItemsData: OrderItemInput[] = await Promise.all(cart.cart_items.map(async (item: CartItem) => {
@@ -119,13 +111,12 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
         return {
           product: item.product.id,
           quantity: item.quantity,
-          price: priceCents, // Use frontend-provided price in cents
+          price: priceCents,
           engravings: item.engravings || [],
           colors: item.colors?.map((color) => color.id) || [],
           promotions: activePromotions.map((promo: any) => promo.id),
         };
       }));
-      strapi.log.debug(`[Order Controller] Prepared order items: ${JSON.stringify(orderItemsData)}`);
 
       const subtotalCents = data.subtotal || orderItemsData.reduce(
         (sum: number, item: OrderItemInput) => sum + item.price * item.quantity,
@@ -143,7 +134,6 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
 
       const totalFromFrontendCents = data.total_amount;
       if (Math.abs(totalFromFrontendCents - calculatedTotalCents) > 1) {
-        strapi.log.error(`[Order Controller] Total mismatch. Expected ${calculatedTotalCents} cents, received ${totalFromFrontendCents} cents`);
         throw new ValidationError(
           `Total mismatch. Expected ${calculatedTotalCents} cents, received ${totalFromFrontendCents} cents`
         );
@@ -206,7 +196,7 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
             order: order.id,
             product: item.product,
             quantity: item.quantity,
-            price: item.price / 100, // Convert to dollars for order-item schema
+            price: item.price / 100,
             colors: item.colors,
             engravings: item.engravings,
             promotions: item.promotions,
@@ -276,11 +266,9 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
           data: newCartData,
           populate: ['cart_items'],
         });
-        strapi.log.debug(`[Order Controller] Created new active cart ${newCart.id} with guest_session ${newGuestSession}`);
 
         if (!user) {
           ctx.cookies.set("session_id", newGuestSession, { httpOnly: true, sameSite: "lax", path: '/' });
-          strapi.log.debug(`[Order Controller] Set session_id cookie to ${newGuestSession} with path '/'`);
         }
 
         return ctx.send({
@@ -294,7 +282,7 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
 
       return ctx.send({ message: 'Order created successfully', orderId: order.id });
     } catch (error) {
-      strapi.log.error('[Order Controller] Error in create order:', error);
+      strapi.log.error('Error in order create:', error);
       throw new ApplicationError('Failed to create order', { cause: error });
     }
   },
@@ -320,7 +308,7 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
       });
       return this.transformResponse(orders);
     } catch (error) {
-      strapi.log.error('[Order Controller] Error in find:', error);
+      strapi.log.error('Error in order find:', error);
       return ctx.internalServerError('Failed to fetch orders', { cause: error });
     }
   },
