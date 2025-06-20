@@ -52,8 +52,8 @@ export default [
   {
     name: 'global::rateLimit',
     config: {
-      interval: 60000, // 1 minute
-      max: 100, // 100 requests per minute
+      maxRequests: 500,
+      windowSeconds: 60,
     },
   },
 ];
