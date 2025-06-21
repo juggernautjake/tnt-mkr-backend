@@ -57,7 +57,7 @@ const ORDER_CONFIRMATION_TEMPLATE = `
     .item-name { font-weight: bold; color: #333; }
     .item-details { display: flex; justify-content: space-between; margin-top: 5px; }
     .customizations { margin-top: 10px; }
-    .customization { display: flex; align-items: center; gap: 15px; margin-bottom: 10px; }
+    .customization { margin-bottom: 10px; }
     .promotions { margin-top: 10px; }
     .button { position: relative; padding: 0.8rem 1.2rem; border-radius: 9999px; font-weight: bold; cursor: pointer; overflow: hidden; transition: transform 0.2s ease-in-out; border: 2px solid transparent; background-color: #fe5100; color: white; display: inline-block; text-decoration: none; text-align: center; margin-top: 20px; }
     .button:hover { transform: scale(1.05); background: linear-gradient(45deg, #fe5100, white, #fe5100); color: #333; }
@@ -245,7 +245,7 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
     try {
       await strapi.plugins['email'].services.email.send({
         to: customerEmail,
-        from: 'TNT MKR <no-reply@tnt-mkr.com>', // Custom sender
+        from: 'TNT MKR <no-reply@tnt-mkr.com>',
         subject: 'Order Confirmation - TNT-MKR',
         html,
       });
