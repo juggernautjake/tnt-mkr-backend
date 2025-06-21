@@ -1,4 +1,3 @@
-// C:\TNT-MKR\tnt-mkr-backend\src\api\webhook-event\services\webhook-event.ts
 import { factories } from '@strapi/strapi';
 import Stripe from 'stripe';
 import Handlebars from 'handlebars';
@@ -11,6 +10,12 @@ interface Order {
   id: number;
   order_number: string;
   total_amount: number;
+  subtotal: number;
+  shipping_cost: number;
+  sales_tax: number;
+  transaction_fee: number;
+  discount_total: number;
+  shipping_method: { name: string };
   ordered_at: string;
   payment_last_four: string;
   customer_name: string;
@@ -71,6 +76,14 @@ const ORDER_CONFIRMATION_TEMPLATE = `
     <div class="order-details">
       <p><strong>Order Number:</strong> {{ order_number }}</p>
       <p><strong>Order Date:</strong> {{ ordered_at }}</p>
+      <p><strong>Shipping Method:</strong> {{ shipping_method }}</p>
+      <p><strong>Subtotal:</strong> {{ subtotal }}</p>
+      <p><strong>Shipping Cost:</strong> {{ shipping_cost }}</p>
+      <p><strong>Tax:</strong> {{ sales_tax }}</p>
+      <p><strong>Transaction Fee:</strong> {{ transaction_fee }}</p>
+      {{#if discount_total}}
+      <p><strong>Discount:</strong> -{{ discount_total }}</p>
+      {{/if}}
       <p><strong>Total:</strong> {{ total_amount }}</p>
       <p><strong>Payment Method:</strong> ****-****-****-{{ payment_last_four }}</p>
       <p><strong>Shipping to:</strong> {{ customer_name }} <br>{{ shipping_address.street }}, {{ shipping_address.city }}, {{ shipping_address.state }} {{ shipping_address.postal_code }}, {{ shipping_address.country }}</p>
@@ -98,6 +111,7 @@ const ORDER_CONFIRMATION_TEMPLATE = `
       </div>
       {{/order_items}}
     </div>
+    <p>If you have any questions, disputes, or changes to your order, please use the contact form on our website at <a href="{{ frontend_url }}/contact">{{ frontend_url }}/contact</a> and include your order number: <strong>{{ order_number }}</strong>.</p>
     <p>We’ll notify you when your order ships.</p>
     <a href="{{ frontend_url }}" class="button">Visit Our Store</a>
     <div class="footer"><p>© TNT MKR. All rights reserved.</p></div>
@@ -124,6 +138,7 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
           'order_items.order_item_parts.product_part',
           'order_items.order_item_parts.color',
           'order_items.promotions',
+          'shipping_method',
         ],
       }) as Order[];
 
@@ -166,6 +181,7 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
             'order_items.order_item_parts.product_part',
             'order_items.order_item_parts.color',
             'order_items.promotions',
+            'shipping_method',
           ],
         }) as Order;
 
@@ -187,6 +203,7 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
           'order_items.order_item_parts.product_part',
           'order_items.order_item_parts.color',
           'order_items.promotions',
+          'shipping_method',
         ],
       }) as Order[];
 
@@ -222,6 +239,7 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
           'order_items.order_item_parts.product_part',
           'order_items.order_item_parts.color',
           'order_items.promotions',
+          'shipping_method',
         ],
       }) as Order;
 
@@ -260,6 +278,12 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
       order_number: order.order_number,
       ordered_at: new Date(order.ordered_at).toLocaleDateString(),
       total_amount: (order.total_amount / 100).toFixed(2),
+      subtotal: (order.subtotal / 100).toFixed(2),
+      shipping_cost: (order.shipping_cost / 100).toFixed(2),
+      sales_tax: (order.sales_tax / 100).toFixed(2),
+      transaction_fee: (order.transaction_fee / 100).toFixed(2),
+      discount_total: order.discount_total > 0 ? (order.discount_total / 100).toFixed(2) : null,
+      shipping_method: order.shipping_method.name,
       payment_last_four: order.payment_last_four || '',
       customer_name: order.customer_name,
       shipping_address: order.shipping_address || {},
