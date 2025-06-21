@@ -58,7 +58,6 @@ const ORDER_CONFIRMATION_TEMPLATE = `
     .item-details { display: flex; justify-content: space-between; margin-top: 5px; }
     .customizations { margin-top: 10px; }
     .customization { display: flex; align-items: center; gap: 15px; margin-bottom: 10px; }
-    .color-bubble { width: 30px; height: 20px; border-radius: 10px; border: 2px solid black; }
     .promotions { margin-top: 10px; }
     .button { position: relative; padding: 0.8rem 1.2rem; border-radius: 9999px; font-weight: bold; cursor: pointer; overflow: hidden; transition: transform 0.2s ease-in-out; border: 2px solid transparent; background-color: #fe5100; color: white; display: inline-block; text-decoration: none; text-align: center; margin-top: 20px; }
     .button:hover { transform: scale(1.05); background: linear-gradient(45deg, #fe5100, white, #fe5100); color: #333; }
@@ -88,7 +87,6 @@ const ORDER_CONFIRMATION_TEMPLATE = `
         {{#order_item_parts}}
         <div class="customization">
           <span>{{ product_part.name }}: {{ color.name }}</span>
-          <div class="color-bubble" style="background: {{ color.hex_codes.0.hex_code }};"></div>
         </div>
         {{/order_item_parts}}
         {{#promotions}}

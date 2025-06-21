@@ -29,6 +29,7 @@ interface CartItem {
 }
 
 interface OrderItemInput {
+  cart_item_id?: string; // Added to uniquely identify the cart item
   product: number;
   quantity: number;
   price: number; // Cents
@@ -99,21 +100,21 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
       }
 
       const currentDate = new Date().toISOString().split('T')[0];
-      const orderItemsData: OrderItemInput[] = await Promise.all(cart.cart_items.map(async (item: CartItem) => {
-        const product = await strapi.entityService.findOne('api::product.product', item.product.id, {
+      const orderItemsData: OrderItemInput[] = await Promise.all(data.order_items.map(async (item: any) => {
+        const product = await strapi.entityService.findOne('api::product.product', item.product, {
           populate: ['promotions'],
         });
         const activePromotions = product.promotions.filter(
           (promo: any) => promo.start_date <= currentDate && promo.end_date >= currentDate && promo.publishedAt
         );
-        const priceCents = data.order_items.find((oi: any) => oi.product === item.product.id)?.price || 
-                          Math.round(item.effective_price * 100);
+        const priceCents = item.price || Math.round(product.effective_price * 100);
         return {
-          product: item.product.id,
+          cart_item_id: item.cart_item_id, // Include cart_item_id from frontend
+          product: item.product,
           quantity: item.quantity,
           price: priceCents,
           engravings: item.engravings || [],
-          colors: item.colors?.map((color) => color.id) || [],
+          colors: item.colors?.map((color: any) => color.id) || [],
           promotions: activePromotions.map((promo: any) => promo.id),
         };
       }));
@@ -203,7 +204,10 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
           },
         });
 
-        const cartItem = cart.cart_items.find((ci: CartItem) => ci.product.id === item.product);
+        // Use cart_item_id if provided to find the exact cart item
+        const cartItem = item.cart_item_id
+          ? cart.cart_items.find((ci: CartItem) => ci.id.toString() === item.cart_item_id)
+          : cart.cart_items.find((ci: CartItem) => ci.product.id === item.product);
         if (cartItem && cartItem.cart_item_parts) {
           for (const cartItemPart of cartItem.cart_item_parts) {
             await strapi.entityService.create('api::order-item-part.order-item-part', {
