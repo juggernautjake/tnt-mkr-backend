@@ -10,12 +10,6 @@ interface Order {
   id: number;
   order_number: string;
   total_amount: number;
-  subtotal: number;
-  shipping_cost: number;
-  sales_tax: number;
-  transaction_fee: number;
-  discount_total: number;
-  shipping_method: { name: string };
   ordered_at: string;
   payment_last_four: string;
   customer_name: string;
@@ -37,6 +31,12 @@ interface Order {
     }>;
     promotions: Array<{ id: number; name: string }>;
   }>;
+  subtotal: number;
+  shipping_cost: number;
+  sales_tax: number;
+  discount_total: number;
+  transaction_fee: number;
+  shipping_method: { id: number; name: string };
 }
 
 interface OrderUpdateData {
@@ -57,6 +57,7 @@ const ORDER_CONFIRMATION_TEMPLATE = `
     .intro-text { text-align: center; margin-bottom: 20px; }
     .order-details { border-top: 1px solid #ddd; padding-top: 15px; margin-bottom: 20px; }
     .order-details p { margin: 8px 0; }
+    .order-summary { margin-top: 20px; }
     .order-items { margin-top: 20px; }
     .order-item { border-bottom: 1px solid #ddd; padding: 10px 0; }
     .item-name { font-weight: bold; color: #333; }
@@ -67,6 +68,7 @@ const ORDER_CONFIRMATION_TEMPLATE = `
     .button { position: relative; padding: 0.8rem 1.2rem; border-radius: 9999px; font-weight: bold; cursor: pointer; overflow: hidden; transition: transform 0.2s ease-in-out; border: 2px solid transparent; background-color: #fe5100; color: white; display: inline-block; text-decoration: none; text-align: center; margin-top: 20px; }
     .button:hover { transform: scale(1.05); background: linear-gradient(45deg, #fe5100, white, #fe5100); color: #333; }
     .footer { margin-top: 20px; font-size: 12px; color: #555; text-align: center; }
+    .contact-instructions { margin-top: 20px; }
   </style>
 </head>
 <body>
@@ -76,18 +78,21 @@ const ORDER_CONFIRMATION_TEMPLATE = `
     <div class="order-details">
       <p><strong>Order Number:</strong> {{ order_number }}</p>
       <p><strong>Order Date:</strong> {{ ordered_at }}</p>
-      <p><strong>Shipping Method:</strong> {{ shipping_method }}</p>
-      <p><strong>Subtotal:</strong> {{ subtotal }}</p>
-      <p><strong>Shipping Cost:</strong> {{ shipping_cost }}</p>
-      <p><strong>Tax:</strong> {{ sales_tax }}</p>
-      <p><strong>Transaction Fee:</strong> {{ transaction_fee }}</p>
-      {{#if discount_total}}
-      <p><strong>Discount:</strong> -{{ discount_total }}</p>
-      {{/if}}
-      <p><strong>Total:</strong> {{ total_amount }}</p>
       <p><strong>Payment Method:</strong> ****-****-****-{{ payment_last_four }}</p>
       <p><strong>Shipping to:</strong> {{ customer_name }} <br>{{ shipping_address.street }}, {{ shipping_address.city }}, {{ shipping_address.state }} {{ shipping_address.postal_code }}, {{ shipping_address.country }}</p>
       <p><strong>Billing Address:</strong> <br>{{ billing_address.street }}, {{ billing_address.city }}, {{ billing_address.state }} {{ billing_address.postal_code }}, {{ billing_address.country }}</p>
+    </div>
+    <div class="order-summary">
+      <h2>Order Summary</h2>
+      <p><strong>Subtotal:</strong> {{ subtotal }}</p>
+      <p><strong>Shipping Method:</strong> {{ shipping_method }}</p>
+      <p><strong>Shipping Cost:</strong> {{ shipping_cost }}</p>
+      <p><strong>Tax:</strong> {{ sales_tax }}</p>
+      {{#if discount_total}}
+      <p><strong>Discount:</strong> -{{ discount_total }}</p>
+      {{/if}}
+      <p><strong>Transaction Fee:</strong> {{ transaction_fee }}</p>
+      <p><strong>Total:</strong> {{ total_amount }}</p>
     </div>
     <div class="order-items">
       <h2 style="font-size: 20px; font-weight: bold; color: #333; margin-bottom: 10px;">Items Purchased</h2>
@@ -111,8 +116,10 @@ const ORDER_CONFIRMATION_TEMPLATE = `
       </div>
       {{/order_items}}
     </div>
-    <p>If you have any questions, disputes, or changes to your order, please use the contact form on our website at <a href="{{ frontend_url }}/contact">{{ frontend_url }}/contact</a> and include your order number: <strong>{{ order_number }}</strong>.</p>
     <p>We’ll notify you when your order ships.</p>
+    <p class="contact-instructions">
+      If you have any questions, disputes, or changes to your order, please use the contact form on our website and reference your order confirmation number.
+    </p>
     <a href="{{ frontend_url }}" class="button">Visit Our Store</a>
     <div class="footer"><p>© TNT MKR. All rights reserved.</p></div>
   </div>
@@ -281,9 +288,9 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
       subtotal: (order.subtotal / 100).toFixed(2),
       shipping_cost: (order.shipping_cost / 100).toFixed(2),
       sales_tax: (order.sales_tax / 100).toFixed(2),
+      discount_total: (order.discount_total / 100).toFixed(2),
       transaction_fee: (order.transaction_fee / 100).toFixed(2),
-      discount_total: order.discount_total > 0 ? (order.discount_total / 100).toFixed(2) : null,
-      shipping_method: order.shipping_method.name,
+      shipping_method: order.shipping_method?.name || 'N/A',
       payment_last_four: order.payment_last_four || '',
       customer_name: order.customer_name,
       shipping_address: order.shipping_address || {},
