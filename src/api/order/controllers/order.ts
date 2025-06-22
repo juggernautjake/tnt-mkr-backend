@@ -13,7 +13,7 @@ if (!stripeSecretKey) {
 
 // Updated API version to a valid, stable version
 const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: '2020-08-27', // Changed from '2025-04-30.basil' to a supported version
+  apiVersion: '2025-04-30.basil', // Changed from '2025-04-30.basil' to a supported version
 });
 
 type CartStatus = 'active' | 'abandoned' | 'converted';
