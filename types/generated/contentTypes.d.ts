@@ -902,6 +902,7 @@ export interface ApiOrderItemOrderItem extends Schema.CollectionType {
     draftAndPublish: false;
   };
   attributes: {
+    base_price: Attribute.Decimal & Attribute.Required;
     colors: Attribute.Relation<
       'api::order-item.order-item',
       'manyToMany',
@@ -986,7 +987,7 @@ export interface ApiOrderOrder extends Schema.CollectionType {
       'manyToOne',
       'api::discount-code.discount-code'
     >;
-    discount_total: Attribute.Decimal;
+    discount_total: Attribute.Integer;
     guest_email: Attribute.Email;
     order_items: Attribute.Relation<
       'api::order.order',
@@ -1004,22 +1005,22 @@ export interface ApiOrderOrder extends Schema.CollectionType {
     payment_method: Attribute.String;
     payment_status: Attribute.Enumeration<['pending', 'completed', 'failed']> &
       Attribute.DefaultTo<'pending'>;
-    sales_tax: Attribute.Decimal;
+    sales_tax: Attribute.Integer;
     shipping_address: Attribute.Relation<
       'api::order.order',
       'oneToOne',
       'api::address.address'
     >;
-    shipping_cost: Attribute.Decimal;
+    shipping_cost: Attribute.Integer;
     shipping_method: Attribute.Relation<
       'api::order.order',
       'oneToOne',
       'api::shipping-option.shipping-option'
     >;
-    subtotal: Attribute.Decimal & Attribute.Required;
-    total_amount: Attribute.Decimal & Attribute.Required;
+    subtotal: Attribute.Integer & Attribute.Required;
+    total_amount: Attribute.Integer & Attribute.Required;
     tracking_number: Attribute.String;
-    transaction_fee: Attribute.Decimal & Attribute.DefaultTo<0.5>;
+    transaction_fee: Attribute.Integer & Attribute.DefaultTo<50>;
     updatedAt: Attribute.DateTime;
     updatedBy: Attribute.Relation<
       'api::order.order',
