@@ -1,10 +1,11 @@
 import { factories } from '@strapi/strapi';
 import Stripe from 'stripe';
 import Handlebars from 'handlebars';
-import { v4 as uuidv4 } from 'uuid'; // Added this import
+import { v4 as uuidv4 } from 'uuid';
 
+// Updated API version to a valid, stable version
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2025-04-30.basil',
+  apiVersion: '2020-08-27', // Changed from '2025-04-30.basil' to a supported version
 });
 
 interface Order {
