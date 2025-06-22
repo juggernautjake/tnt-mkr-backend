@@ -26,6 +26,11 @@
       "type": "decimal",
       "required": true
     },
+    "base_price": {
+      "type": "decimal",
+      "required": true,
+      "description": "The original price before discounts"
+    },
     "colors": {
       "type": "relation",
       "relation": "manyToMany",

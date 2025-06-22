@@ -183,12 +183,16 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
       });
 
       for (const itemInput of orderItemsInput) {
+        const product = await strapi.entityService.findOne('api::product.product', itemInput.product, {
+          fields: ['default_price', 'units_sold'],
+        });
         const orderItem = await strapi.entityService.create('api::order-item.order-item', {
           data: {
             order: order.id,
             product: itemInput.product,
             quantity: itemInput.quantity,
             price: itemInput.price / 100,
+            base_price: product.default_price, // Added to store original price
             colors: itemInput.colors,
             engravings: itemInput.engravings,
             promotions: itemInput.promotions,
@@ -207,9 +211,6 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
           }
         }
 
-        const product = await strapi.entityService.findOne('api::product.product', itemInput.product, {
-          fields: ['units_sold'],
-        });
         if (product) {
           const newUnitsSold = (product.units_sold || 0) + itemInput.quantity;
           await strapi.entityService.update('api::product.product', itemInput.product, {
@@ -295,6 +296,7 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
           },
           shipping_address: true,
           billing_address: true,
+          shipping_method: true, // Added to populate shipping method
         },
       });
       return this.transformResponse(orders);

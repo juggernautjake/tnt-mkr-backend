@@ -23,6 +23,7 @@ interface Order {
     id: number;
     product: { id: number; name: string };
     price: string;
+    base_price: number; // Added
     quantity: number;
     order_item_parts: Array<{
       id: number;
@@ -90,8 +91,12 @@ const ORDER_CONFIRMATION_TEMPLATE = `
       <p><strong>Tax:</strong> {{ sales_tax }}</p>
       {{#if discount_total}}
       <p><strong>Discount:</strong> -{{ discount_total }}</p>
-      <p><strong>Amount Saved:</strong> {{ amount_saved }}</p>
-      <p><strong>Promotions Applied:</strong> {{ promotion_names }}</p>
+      {{/if}}
+      {{#if total_saved}}
+      <p><strong>Amount Saved:</strong> {{ total_saved }}</p>
+      {{/if}}
+      {{#if promotion_names}}
+      <p><strong>Promotions Applied:</strong> {{ promotion_names.join(', ') }}</p>
       {{/if}}
       <p><strong>Transaction Fee:</strong> {{ transaction_fee }}</p>
       <p><strong>Total:</strong> {{ total_amount }}</p>
@@ -145,7 +150,7 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
           'billing_address',
           'order_items.product',
           'order_items.order_item_parts.product_part',
-          'order_items.order_item_parts.color',
+          'order_items.order_item_partsmeals: true,
           'order_items.promotions',
           'shipping_method',
         ],
@@ -283,28 +288,23 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
   },
 
   transformOrderData(order: Order) {
-    const subtotal = order.subtotal / 100;
-    const shippingCost = order.shipping_cost / 100;
-    const salesTax = order.sales_tax / 100;
-    const transactionFee = order.transaction_fee / 100;
-    const discountTotal = order.discount_total / 100;
-    const totalAmount = order.total_amount / 100;
-    const originalTotal = subtotal + shippingCost + salesTax + transactionFee;
-    const amountSaved = discountTotal > 0 ? originalTotal - totalAmount : 0;
-    const promotionNames = order.order_items
-      .flatMap(item => item.promotions.map(promo => promo.name))
-      .filter((name, index, self) => self.indexOf(name) === index)
-      .join(', ') || 'None';
+    const totalSavedCents = order.order_items.reduce((sum, item) => {
+      const basePrice = item.base_price;
+      const price = parseFloat(item.price);
+      return sum + (basePrice - price) * item.quantity * 100;
+    }, 0);
+    const totalSaved = (totalSavedCents / 100).toFixed(2);
+    const promotionNames = [...new Set(order.order_items.flatMap(item => item.promotions.map(p => p.name)))];
 
     return {
       order_number: order.order_number,
       ordered_at: new Date(order.ordered_at).toLocaleDateString(),
-      total_amount: totalAmount.toFixed(2),
-      subtotal: subtotal.toFixed(2),
-      shipping_cost: shippingCost.toFixed(2),
-      sales_tax: salesTax.toFixed(2),
-      discount_total: discountTotal.toFixed(2),
-      transaction_fee: transactionFee.toFixed(2),
+      total_amount: (order.total_amount / 100).toFixed(2),
+      subtotal: (order.subtotal / 100).toFixed(2),
+      shipping_cost: (order.shipping_cost / 100).toFixed(2),
+      sales_tax: (order.sales_tax / 100).toFixed(2),
+      discount_total: (order.discount_total / 100).toFixed(2),
+      transaction_fee: (order.transaction_fee / 100).toFixed(2),
       shipping_method: order.shipping_method?.name || 'N/A',
       payment_last_four: order.payment_last_four || '',
       customer_name: order.customer_name,
@@ -320,9 +320,9 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
         })),
         promotions: item.promotions,
       })),
-      amount_saved: amountSaved.toFixed(2),
-      promotion_names: promotionNames,
       frontend_url: process.env.FRONTEND_URL || 'https://www.tnt-mkr.com',
+      total_saved: totalSaved,
+      promotion_names: promotionNames,
     };
   },
 }));
