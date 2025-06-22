@@ -29,7 +29,7 @@ interface CartItem {
 }
 
 interface OrderItemInput {
-  cart_item_id?: string; // Added to uniquely identify the cart item
+  cart_item_id?: string;
   product: number;
   quantity: number;
   price: number; // Cents
@@ -109,7 +109,7 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
         );
         const priceCents = item.price || Math.round(product.effective_price * 100);
         return {
-          cart_item_id: item.cart_item_id, // Include cart_item_id from frontend
+          cart_item_id: item.cart_item_id,
           product: item.product,
           quantity: item.quantity,
           price: priceCents,
@@ -200,15 +200,14 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
             order: order.id,
             product: item.product,
             quantity: item.quantity,
-            price: item.price / 100, // Convert cents to dollars
-            base_price: product.default_price, // Added required base_price field
+            price: item.price / 100,
+            base_price: product.default_price,
             colors: item.colors,
             engravings: item.engravings,
             promotions: item.promotions,
           },
         });
 
-        // Use cart_item_id if provided to find the exact cart item
         const cartItem = item.cart_item_id
           ? cart.cart_items.find((ci: CartItem) => ci.id.toString() === item.cart_item_id)
           : cart.cart_items.find((ci: CartItem) => ci.product.id === item.product);
@@ -243,45 +242,13 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
           data: { payment_intent_id: paymentIntent.id },
         });
 
-        await strapi.entityService.update('api::cart.cart', data.cartId, {
-          data: { cart_items: [], total: 0, status: 'converted' },
-        });
-
-        let newGuestSession: string | null = user ? null : uuidv4();
-        if (!user) {
-          let existingCarts = await strapi.entityService.findMany('api::cart.cart', {
-            filters: { guest_session: newGuestSession },
-          });
-          while (existingCarts.length > 0) {
-            newGuestSession = uuidv4();
-            existingCarts = await strapi.entityService.findMany('api::cart.cart', {
-              filters: { guest_session: newGuestSession },
-            });
-          }
-        }
-
-        const newCartData = {
-          total: 0,
-          status: 'active' as const,
-          user: user ? user.id : null,
-          guest_session: newGuestSession,
-        };
-
-        const newCart = await strapi.entityService.create('api::cart.cart', {
-          data: newCartData,
-          populate: ['cart_items'],
-        });
-
-        if (!user) {
-          ctx.cookies.set("session_id", newGuestSession, { httpOnly: true, sameSite: "lax", path: '/' });
-        }
-
+        // Only update cart and create new cart on successful payment confirmation, not here
         return ctx.send({
           message: 'Order created, proceed to payment',
           orderId: order.id,
           paymentIntentClientSecret: paymentIntent.client_secret,
-          newCartId: newCart.id,
-          newGuestSession: newGuestSession,
+          cartId: data.cartId, // Return current cart ID
+          guestSession: cart.guest_session, // Return current guest session
         });
       }
 

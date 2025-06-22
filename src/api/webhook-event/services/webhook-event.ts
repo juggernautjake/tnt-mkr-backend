@@ -189,6 +189,41 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
         await strapi.entityService.update('api::order.order', order.id, { data: updateData });
         strapi.log.info(`Updated order ${order.id} to payment_status: completed, order_status: paid`);
 
+        // Update cart to 'converted' and create new cart
+        const cart = await strapi.entityService.findMany('api::cart.cart', {
+          filters: { id: event_data.metadata.cart_id, status: 'active' },
+        });
+        if (cart.length > 0) {
+          await strapi.entityService.update('api::cart.cart', cart[0].id, {
+            data: { cart_items: [], total: 0, status: 'converted' },
+          });
+
+          let newGuestSession: string | null = order.user ? null : uuidv4();
+          if (!order.user) {
+            let existingCarts = await strapi.entityService.findMany('api::cart.cart', {
+              filters: { guest_session: newGuestSession },
+            });
+            while (existingCarts.length > 0) {
+              newGuestSession = uuidv4();
+              existingCarts = await strapi.entityService.findMany('api::cart.cart', {
+                filters: { guest_session: newGuestSession },
+              });
+            }
+          }
+
+          const newCartData = {
+            total: 0,
+            status: 'active' as const,
+            user: order.user ? order.user.id : null,
+            guest_session: newGuestSession,
+          };
+
+          await strapi.entityService.create('api::cart.cart', {
+            data: newCartData,
+            populate: ['cart_items'],
+          });
+        }
+
         const updatedOrder = await strapi.db.query('api::order.order').findOne({
           where: { id: order.id },
           populate: [
@@ -235,7 +270,7 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
       await strapi.entityService.update('api::order.order', order.id, { data: updateData });
       strapi.log.info(`Updated order ${order.id} to payment_status: failed, order_status: canceled`);
 
-      // Optionally notify the user
+      // Do not clear or convert cart here; keep it active for retry
       const customerEmail = order.guest_email || order.user?.email;
       if (customerEmail) {
         await strapi.plugins['email'].services.email.send({
