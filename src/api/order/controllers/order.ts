@@ -192,12 +192,16 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
       });
 
       for (const item of orderItemsData) {
+        const product = await strapi.entityService.findOne('api::product.product', item.product, {
+          fields: ['default_price', 'effective_price', 'units_sold'],
+        });
         const orderItem = await strapi.entityService.create('api::order-item.order-item', {
           data: {
             order: order.id,
             product: item.product,
             quantity: item.quantity,
-            price: item.price / 100,
+            price: item.price / 100, // Convert cents to dollars
+            base_price: product.default_price, // Added required base_price field
             colors: item.colors,
             engravings: item.engravings,
             promotions: item.promotions,
@@ -220,9 +224,6 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
           }
         }
 
-        const product = await strapi.entityService.findOne('api::product.product', item.product, {
-          fields: ['units_sold'],
-        });
         if (product) {
           const newUnitsSold = (product.units_sold || 0) + item.quantity;
           await strapi.entityService.update('api::product.product', item.product, {
