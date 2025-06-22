@@ -3,9 +3,8 @@ import Stripe from 'stripe';
 import Handlebars from 'handlebars';
 import { v4 as uuidv4 } from 'uuid';
 
-// Updated API version to a valid, stable version
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2025-04-30.basil', // Changed from '2025-04-30.basil' to a supported version
+  apiVersion: '2025-05-28.basil', // Updated to latest version
 });
 
 interface Order {
@@ -191,39 +190,39 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
         await strapi.entityService.update('api::order.order', order.id, { data: updateData });
         strapi.log.info(`Updated order ${order.id} to payment_status: completed, order_status: paid`);
 
-        // Update cart to 'converted' and create new cart
-        const cart = await strapi.entityService.findMany('api::cart.cart', {
-          filters: { id: event_data.metadata.cart_id, status: 'active' },
-        });
-        if (cart.length > 0) {
-          await strapi.entityService.update('api::cart.cart', cart[0].id, {
-            data: { cart_items: [], total: 0, status: 'converted' },
-          });
-
-          let newGuestSession: string | null = order.user ? null : uuidv4();
-          if (!order.user) {
-            let existingCarts = await strapi.entityService.findMany('api::cart.cart', {
-              filters: { guest_session: newGuestSession },
+        const cartId = event_data.metadata.cart_id;
+        if (cartId) {
+          const cart = await strapi.entityService.findOne('api::cart.cart', cartId, {});
+          if (cart && cart.status === 'active') {
+            await strapi.entityService.update('api::cart.cart', cartId, {
+              data: { cart_items: [], total: 0, status: 'converted' },
             });
-            while (existingCarts.length > 0) {
-              newGuestSession = uuidv4();
-              existingCarts = await strapi.entityService.findMany('api::cart.cart', {
+
+            let newGuestSession: string | null = order.user ? null : uuidv4();
+            if (!order.user) {
+              let existingCarts = await strapi.entityService.findMany('api::cart.cart', {
                 filters: { guest_session: newGuestSession },
               });
+              while (existingCarts.length > 0) {
+                newGuestSession = uuidv4();
+                existingCarts = await strapi.entityService.findMany('api::cart.cart', {
+                  filters: { guest_session: newGuestSession },
+                });
+              }
             }
+
+            const newCartData = {
+              total: 0,
+              status: 'active' as const,
+              user: order.user ? order.user.id : null,
+              guest_session: newGuestSession,
+            };
+
+            await strapi.entityService.create('api::cart.cart', {
+              data: newCartData,
+              populate: ['cart_items'],
+            });
           }
-
-          const newCartData = {
-            total: 0,
-            status: 'active' as const,
-            user: order.user ? order.user.id : null,
-            guest_session: newGuestSession,
-          };
-
-          await strapi.entityService.create('api::cart.cart', {
-            data: newCartData,
-            populate: ['cart_items'],
-          });
         }
 
         const updatedOrder = await strapi.db.query('api::order.order').findOne({
@@ -272,14 +271,14 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
       await strapi.entityService.update('api::order.order', order.id, { data: updateData });
       strapi.log.info(`Updated order ${order.id} to payment_status: failed, order_status: canceled`);
 
-      // Do not clear or convert cart here; keep it active for retry
       const customerEmail = order.guest_email || order.user?.email;
       if (customerEmail) {
+        const failureReason = event_data.last_payment_error?.message || 'Unknown reason';
         await strapi.plugins['email'].services.email.send({
           to: customerEmail,
           from: 'TNT MKR <no-reply@tnt-mkr.com>',
           subject: 'Payment Failed - TNT-MKR',
-          text: `Your payment for order ${order.order_number} failed. Please try again with a different payment method.`,
+          text: `Your payment for order ${order.order_number} failed due to: ${failureReason}. Please try again with a different payment method.`,
         });
         strapi.log.info(`Sent payment failure email to ${customerEmail} for order ${order.id}`);
       }

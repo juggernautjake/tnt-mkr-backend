@@ -11,9 +11,8 @@ if (!stripeSecretKey) {
   throw new Error('STRIPE_SECRET_KEY is not set in the environment variables');
 }
 
-// Updated API version to a valid, stable version
 const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: '2025-04-30.basil', // Changed from '2025-04-30.basil' to a supported version
+  apiVersion: '2025-05-28.basil', // Updated to latest version
 });
 
 type CartStatus = 'active' | 'abandoned' | 'converted';
@@ -236,20 +235,19 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
         const paymentIntent = await stripe.paymentIntents.create({
           amount: totalFromFrontendCents,
           currency: 'usd',
-          metadata: { order_id: order.id, order_number: order.order_number },
+          metadata: { order_id: order.id, order_number: order.order_number, cart_id: data.cartId },
         });
 
         await strapi.entityService.update('api::order.order', order.id, {
           data: { payment_intent_id: paymentIntent.id },
         });
 
-        // Only update cart and create new cart on successful payment confirmation, not here
         return ctx.send({
           message: 'Order created, proceed to payment',
           orderId: order.id,
           paymentIntentClientSecret: paymentIntent.client_secret,
-          cartId: data.cartId, // Return current cart ID
-          guestSession: cart.guest_session, // Return current guest session
+          cartId: data.cartId,
+          guestSession: cart.guest_session,
         });
       }
 
