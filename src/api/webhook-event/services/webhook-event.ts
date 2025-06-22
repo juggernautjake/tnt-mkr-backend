@@ -208,6 +208,44 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
         strapi.log.error(`Error processing payment_intent.succeeded for order ${order.id}: ${error.message}`);
         throw error;
       }
+    } else if (event_type === 'payment_intent.payment_failed') {
+      const paymentIntentId = event_data.id;
+
+      const orders = await strapi.db.query('api::order.order').findMany({
+        where: { payment_intent_id: paymentIntentId },
+        populate: ['user', 'shipping_address', 'billing_address'],
+      }) as Order[];
+
+      if (orders.length === 0) {
+        strapi.log.warn(`No order found for payment_intent_id: ${paymentIntentId}`);
+        return;
+      }
+
+      const order = orders[0];
+      if (order.payment_status === 'failed') {
+        strapi.log.info(`Order ${order.id} already marked as failed; skipping`);
+        return;
+      }
+
+      const updateData: OrderUpdateData = {
+        payment_status: 'failed',
+        order_status: 'canceled',
+      };
+
+      await strapi.entityService.update('api::order.order', order.id, { data: updateData });
+      strapi.log.info(`Updated order ${order.id} to payment_status: failed, order_status: canceled`);
+
+      // Optionally notify the user
+      const customerEmail = order.guest_email || order.user?.email;
+      if (customerEmail) {
+        await strapi.plugins['email'].services.email.send({
+          to: customerEmail,
+          from: 'TNT MKR <no-reply@tnt-mkr.com>',
+          subject: 'Payment Failed - TNT-MKR',
+          text: `Your payment for order ${order.order_number} failed. Please try again with a different payment method.`,
+        });
+        strapi.log.info(`Sent payment failure email to ${customerEmail} for order ${order.id}`);
+      }
     } else if (event_type === 'charge.succeeded') {
       const paymentIntentId = event_data.payment_intent;
 
@@ -262,31 +300,6 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
       }) as Order;
 
       await this.sendConfirmationEmail(updatedOrder);
-    } else if (event_type === 'payment_intent.payment_failed') {
-      const paymentIntentId = event_data.id;
-
-      const orders = await strapi.db.query('api::order.order').findMany({
-        where: { payment_intent_id: paymentIntentId },
-      }) as Order[];
-
-      if (orders.length === 0) {
-        strapi.log.warn(`No order found for payment_intent_id: ${paymentIntentId}`);
-        return;
-      }
-
-      const order = orders[0];
-      if (order.payment_status === 'failed') {
-        strapi.log.info(`Order ${order.id} already marked as failed; skipping`);
-        return;
-      }
-
-      const updateData: OrderUpdateData = {
-        payment_status: 'failed',
-        order_status: 'canceled',
-      };
-
-      await strapi.entityService.update('api::order.order', order.id, { data: updateData });
-      strapi.log.info(`Updated order ${order.id} to payment_status: failed, order_status: canceled`);
     } else {
       strapi.log.warn(`Unhandled event type: ${event_type}`);
     }
