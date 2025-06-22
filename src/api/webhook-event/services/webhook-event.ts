@@ -150,7 +150,7 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
           'billing_address',
           'order_items.product',
           'order_items.order_item_parts.product_part',
-          'order_items.order_item_partsmeals: true,
+          'order_items.order_item_partsmeals: true',
           'order_items.promotions',
           'shipping_method',
         ],
