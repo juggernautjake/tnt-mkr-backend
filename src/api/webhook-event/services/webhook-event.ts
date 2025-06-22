@@ -23,7 +23,6 @@ interface Order {
     id: number;
     product: { id: number; name: string };
     price: string;
-    base_price: number; // Added
     quantity: number;
     order_item_parts: Array<{
       id: number;
@@ -70,6 +69,7 @@ const ORDER_CONFIRMATION_TEMPLATE = `
     .button:hover { transform: scale(1.05); background: linear-gradient(45deg, #fe5100, white, #fe5100); color: #333; }
     .footer { margin-top: 20px; font-size: 12px; color: #555; text-align: center; }
     .contact-instructions { margin-top: 20px; }
+    .promotions-list { margin-top: 20px; }
   </style>
 </head>
 <body>
@@ -90,13 +90,7 @@ const ORDER_CONFIRMATION_TEMPLATE = `
       <p><strong>Shipping Cost:</strong> {{ shipping_cost }}</p>
       <p><strong>Tax:</strong> {{ sales_tax }}</p>
       {{#if discount_total}}
-      <p><strong>Discount:</strong> -{{ discount_total }}</p>
-      {{/if}}
-      {{#if total_saved}}
-      <p><strong>Amount Saved:</strong> {{ total_saved }}</p>
-      {{/if}}
-      {{#if promotion_names}}
-      <p><strong>Promotions Applied:</strong> {{ promotion_names.join(', ') }}</p>
+      <p><strong>Total Discount:</strong> -{{ discount_total }}</p>
       {{/if}}
       <p><strong>Transaction Fee:</strong> {{ transaction_fee }}</p>
       <p><strong>Total:</strong> {{ total_amount }}</p>
@@ -123,6 +117,16 @@ const ORDER_CONFIRMATION_TEMPLATE = `
       </div>
       {{/order_items}}
     </div>
+    {{#if applied_promotions.length}}
+    <div class="promotions-list">
+      <h2 style="font-size: 20px; font-weight: bold; color: #333; margin-bottom: 10px;">Applied Promotions</h2>
+      <ul>
+        {{#applied_promotions}}
+        <li>{{ this }}</li>
+        {{/applied_promotions}}
+      </ul>
+    </div>
+    {{/if}}
     <p>We’ll notify you when your order ships.</p>
     <p class="contact-instructions">
       If you have any questions, disputes, or changes to your order, please use the contact form on our website and reference your order confirmation number.
@@ -150,7 +154,7 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
           'billing_address',
           'order_items.product',
           'order_items.order_item_parts.product_part',
-          'order_items.order_item_partsmeals: true',
+          'order_items.order_item_parts.color',
           'order_items.promotions',
           'shipping_method',
         ],
@@ -288,14 +292,7 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
   },
 
   transformOrderData(order: Order) {
-    const totalSavedCents = order.order_items.reduce((sum, item) => {
-      const basePrice = item.base_price;
-      const price = parseFloat(item.price);
-      return sum + (basePrice - price) * item.quantity * 100;
-    }, 0);
-    const totalSaved = (totalSavedCents / 100).toFixed(2);
-    const promotionNames = [...new Set(order.order_items.flatMap(item => item.promotions.map(p => p.name)))];
-
+    const appliedPromotions = Array.from(new Set(order.order_items.flatMap(item => item.promotions.map(p => p.name))));
     return {
       order_number: order.order_number,
       ordered_at: new Date(order.ordered_at).toLocaleDateString(),
@@ -320,9 +317,8 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
         })),
         promotions: item.promotions,
       })),
+      applied_promotions: appliedPromotions,
       frontend_url: process.env.FRONTEND_URL || 'https://www.tnt-mkr.com',
-      total_saved: totalSaved,
-      promotion_names: promotionNames,
     };
   },
 }));

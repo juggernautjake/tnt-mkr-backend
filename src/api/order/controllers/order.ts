@@ -29,13 +29,13 @@ interface CartItem {
 }
 
 interface OrderItemInput {
+  cart_item_id?: string; // Added to uniquely identify the cart item
   product: number;
   quantity: number;
   price: number; // Cents
   engravings: any[];
   colors: number[];
   promotions: number[];
-  order_item_parts: Array<{ product_part: number; color: number }>;
 }
 
 interface OrderInput {
@@ -100,21 +100,30 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
       }
 
       const currentDate = new Date().toISOString().split('T')[0];
-      const orderItemsInput: OrderItemInput[] = data.order_items.map((item: any) => ({
-        product: item.product,
-        quantity: item.quantity,
-        price: item.price, // Already in cents
-        engravings: item.engravings || [],
-        colors: item.colors || [],
-        promotions: item.promotions || [],
-        order_item_parts: item.order_item_parts || [],
+      const orderItemsData: OrderItemInput[] = await Promise.all(data.order_items.map(async (item: any) => {
+        const product = await strapi.entityService.findOne('api::product.product', item.product, {
+          populate: ['promotions'],
+        });
+        const activePromotions = product.promotions.filter(
+          (promo: any) => promo.start_date <= currentDate && promo.end_date >= currentDate && promo.publishedAt
+        );
+        const priceCents = item.price || Math.round(product.effective_price * 100);
+        return {
+          cart_item_id: item.cart_item_id, // Include cart_item_id from frontend
+          product: item.product,
+          quantity: item.quantity,
+          price: priceCents,
+          engravings: item.engravings || [],
+          colors: item.colors?.map((color: any) => color.id) || [],
+          promotions: activePromotions.map((promo: any) => promo.id),
+        };
       }));
 
-      const subtotalCents = data.subtotal || orderItemsInput.reduce(
+      const subtotalCents = data.subtotal || orderItemsData.reduce(
         (sum: number, item: OrderItemInput) => sum + item.price * item.quantity,
         0
       );
-      const totalItems = orderItemsInput.reduce((sum: number, item: OrderItemInput) => sum + item.quantity, 0);
+      const totalItems = orderItemsData.reduce((sum: number, item: OrderItemInput) => sum + item.quantity, 0);
       const baseCostCents = Math.round(shippingMethod.baseCost * 100);
       const costPerItemCents = Math.round(shippingMethod.costPerItem * 100);
       const shippingCents = data.shipping_cost || (baseCostCents + costPerItemCents * (totalItems - 1));
@@ -182,38 +191,41 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
         populate: ['order_items'],
       });
 
-      for (const itemInput of orderItemsInput) {
-        const product = await strapi.entityService.findOne('api::product.product', itemInput.product, {
-          fields: ['default_price', 'units_sold'],
-        });
+      for (const item of orderItemsData) {
         const orderItem = await strapi.entityService.create('api::order-item.order-item', {
           data: {
             order: order.id,
-            product: itemInput.product,
-            quantity: itemInput.quantity,
-            price: itemInput.price / 100,
-            base_price: product.default_price, // Added to store original price
-            colors: itemInput.colors,
-            engravings: itemInput.engravings,
-            promotions: itemInput.promotions,
+            product: item.product,
+            quantity: item.quantity,
+            price: item.price / 100,
+            colors: item.colors,
+            engravings: item.engravings,
+            promotions: item.promotions,
           },
         });
 
-        if (itemInput.order_item_parts) {
-          for (const partInput of itemInput.order_item_parts) {
+        // Use cart_item_id if provided to find the exact cart item
+        const cartItem = item.cart_item_id
+          ? cart.cart_items.find((ci: CartItem) => ci.id.toString() === item.cart_item_id)
+          : cart.cart_items.find((ci: CartItem) => ci.product.id === item.product);
+        if (cartItem && cartItem.cart_item_parts) {
+          for (const cartItemPart of cartItem.cart_item_parts) {
             await strapi.entityService.create('api::order-item-part.order-item-part', {
               data: {
                 order_item: orderItem.id,
-                product_part: partInput.product_part,
-                color: partInput.color,
+                product_part: cartItemPart.product_part.id,
+                color: cartItemPart.color.id,
               },
             });
           }
         }
 
+        const product = await strapi.entityService.findOne('api::product.product', item.product, {
+          fields: ['units_sold'],
+        });
         if (product) {
-          const newUnitsSold = (product.units_sold || 0) + itemInput.quantity;
-          await strapi.entityService.update('api::product.product', itemInput.product, {
+          const newUnitsSold = (product.units_sold || 0) + item.quantity;
+          await strapi.entityService.update('api::product.product', item.product, {
             data: { units_sold: newUnitsSold },
           });
         }
@@ -296,7 +308,6 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
           },
           shipping_address: true,
           billing_address: true,
-          shipping_method: true, // Added to populate shipping method
         },
       });
       return this.transformResponse(orders);
