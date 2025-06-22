@@ -262,6 +262,31 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
       }) as Order;
 
       await this.sendConfirmationEmail(updatedOrder);
+    } else if (event_type === 'payment_intent.payment_failed') {
+      const paymentIntentId = event_data.id;
+
+      const orders = await strapi.db.query('api::order.order').findMany({
+        where: { payment_intent_id: paymentIntentId },
+      }) as Order[];
+
+      if (orders.length === 0) {
+        strapi.log.warn(`No order found for payment_intent_id: ${paymentIntentId}`);
+        return;
+      }
+
+      const order = orders[0];
+      if (order.payment_status === 'failed') {
+        strapi.log.info(`Order ${order.id} already marked as failed; skipping`);
+        return;
+      }
+
+      const updateData: OrderUpdateData = {
+        payment_status: 'failed',
+        order_status: 'canceled',
+      };
+
+      await strapi.entityService.update('api::order.order', order.id, { data: updateData });
+      strapi.log.info(`Updated order ${order.id} to payment_status: failed, order_status: canceled`);
     } else {
       strapi.log.warn(`Unhandled event type: ${event_type}`);
     }
