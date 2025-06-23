@@ -12,7 +12,7 @@ if (!stripeSecretKey) {
 }
 
 const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: '2025-05-28.basil', // Updated to latest version
+  apiVersion: '2025-04-30.basil', // Use a stable version compatible with test mode
 });
 
 type CartStatus = 'active' | 'abandoned' | 'converted';
@@ -21,8 +21,8 @@ interface CartItem {
   id: number;
   product: { id: number; name: string };
   quantity: number;
-  price: string; // Price in cents from frontend
-  effective_price: number; // Dollars from backend
+  price: string;
+  effective_price: number;
   colors?: Array<{ id: number; name: string }>;
   engravings?: any[];
   cart_item_parts?: Array<{ product_part: { id: number }; color: { id: number } }>;
@@ -32,7 +32,7 @@ interface OrderItemInput {
   cart_item_id?: string;
   product: number;
   quantity: number;
-  price: number; // Cents
+  price: number;
   engravings: any[];
   colors: number[];
   promotions: number[];
@@ -47,16 +47,16 @@ interface OrderInput {
   ordered_at: Date;
   customer_name: string;
   customer_phone: string;
-  total_amount: number; // Cents
+  total_amount: number;
   order_status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'canceled' | 'returned';
   payment_status: 'pending' | 'completed' | 'failed';
   shipping_address: number;
   billing_address: number;
-  subtotal: number; // Cents
-  shipping_cost: number; // Cents
-  sales_tax: number; // Cents
-  transaction_fee: number; // Cents
-  discount_total: number; // Cents
+  subtotal: number;
+  shipping_cost: number;
+  sales_tax: number;
+  transaction_fee: number;
+  discount_total: number;
   payment_last_four: string;
 }
 
