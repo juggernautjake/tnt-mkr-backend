@@ -122,6 +122,10 @@
     },
     "payment_last_four": {
       "type": "string"
+    },
+    "confirmation_email_sent": {
+      "type": "boolean",
+      "default": false
     }
   }
 }

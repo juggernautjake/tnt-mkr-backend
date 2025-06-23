@@ -12,7 +12,7 @@ if (!stripeSecretKey) {
 }
 
 const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: '2025-05-28.basil', // Use a stable version compatible with test mode
+  apiVersion: '2025-05-28.basil',
 });
 
 type CartStatus = 'active' | 'abandoned' | 'converted';
@@ -58,6 +58,7 @@ interface OrderInput {
   transaction_fee: number;
   discount_total: number;
   payment_last_four: string;
+  confirmation_email_sent: boolean;
 }
 
 export default factories.createCoreController('api::order.order', ({ strapi }) => ({
@@ -130,7 +131,20 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
       const taxRate = process.env.TAX_RATE ? parseFloat(process.env.TAX_RATE) : 0.0825;
       const taxCents = data.sales_tax || Math.round(subtotalCents * taxRate);
       const transactionFeeCents = data.transaction_fee || 50;
-      const discountsCents = data.discount_total || 0;
+
+      // Calculate total discount based on order items
+      let totalDiscountCents = 0;
+      const orderItemsWithBasePrice = await Promise.all(orderItemsData.map(async (item) => {
+        const product = await strapi.entityService.findOne('api::product.product', item.product, {
+          fields: ['default_price'],
+        });
+        const basePriceCents = Math.round(product.default_price * 100);
+        const itemDiscountCents = (basePriceCents - item.price) * item.quantity;
+        totalDiscountCents += itemDiscountCents > 0 ? itemDiscountCents : 0;
+        return { ...item, base_price: basePriceCents };
+      }));
+
+      const discountsCents = totalDiscountCents;
       const calculatedTotalCents = subtotalCents + shippingCents + taxCents + transactionFeeCents - discountsCents;
 
       const totalFromFrontendCents = data.total_amount;
@@ -184,6 +198,7 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
         transaction_fee: transactionFeeCents,
         discount_total: discountsCents,
         payment_last_four: '',
+        confirmation_email_sent: false,
       };
 
       const order = await strapi.entityService.create('api::order.order', {
@@ -191,7 +206,7 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
         populate: ['order_items'],
       });
 
-      for (const item of orderItemsData) {
+      for (const item of orderItemsWithBasePrice) {
         const product = await strapi.entityService.findOne('api::product.product', item.product, {
           fields: ['default_price', 'effective_price', 'units_sold'],
         });
@@ -201,7 +216,7 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
             product: item.product,
             quantity: item.quantity,
             price: item.price / 100,
-            base_price: product.default_price,
+            base_price: item.base_price / 100,
             colors: item.colors,
             engravings: item.engravings,
             promotions: item.promotions,

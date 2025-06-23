@@ -23,6 +23,7 @@ interface Order {
     id: number;
     product: { id: number; name: string };
     price: string;
+    base_price: string;
     quantity: number;
     order_item_parts: Array<{
       id: number;
@@ -37,6 +38,7 @@ interface Order {
   discount_total: number;
   transaction_fee: number;
   shipping_method: { id: number; name: string };
+  confirmation_email_sent: boolean;
 }
 
 interface OrderUpdateData {
@@ -70,6 +72,7 @@ const ORDER_CONFIRMATION_TEMPLATE = `
     .footer { margin-top: 20px; font-size: 12px; color: #555; text-align: center; }
     .contact-instructions { margin-top: 20px; }
     .promotions-list { margin-top: 20px; }
+    .strikethrough { text-decoration: line-through; color: #888; margin-right: 10px; }
   </style>
 </head>
 <body>
@@ -90,7 +93,7 @@ const ORDER_CONFIRMATION_TEMPLATE = `
       <p><strong>Shipping Cost:</strong> {{ shipping_cost }}</p>
       <p><strong>Tax:</strong> {{ sales_tax }}</p>
       {{#if discount_total}}
-      <p><strong>Total Discount:</strong> -{{ discount_total }}</p>
+      <p><strong>Total Amount Saved:</strong> -{{ discount_total }}</p>
       {{/if}}
       <p><strong>Transaction Fee:</strong> {{ transaction_fee }}</p>
       <p><strong>Total:</strong> {{ total_amount }}</p>
@@ -101,7 +104,11 @@ const ORDER_CONFIRMATION_TEMPLATE = `
       <div class="order-item">
         <div class="item-name">{{ product.name }}</div>
         <div class="item-details">
-          <span>Price: {{ price }}<br>Quantity: {{ quantity }}</span>
+          {{#if (gt base_price price)}}
+            <span>Original Price: <span class="strikethrough">{{ base_price }}</span><br>Discounted Price: {{ price }}<br>Quantity: {{ quantity }}</span>
+          {{else}}
+            <span>Price: {{ price }}<br>Quantity: {{ quantity }}</span>
+          {{/if}}
         </div>
         {{#order_item_parts}}
         <div class="customization">
@@ -138,6 +145,10 @@ const ORDER_CONFIRMATION_TEMPLATE = `
 </html>
 `;
 
+Handlebars.registerHelper('gt', function (a, b) {
+  return parseFloat(a) > parseFloat(b);
+});
+
 export default factories.createCoreService('api::webhook-event.webhook-event', ({ strapi }) => ({
   async processWebhookEvent(event: any) {
     const { event_type, event_data } = event;
@@ -170,6 +181,10 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
         strapi.log.info(`Order ${order.id} already completed; skipping`);
         return;
       }
+      if (order.confirmation_email_sent) {
+        strapi.log.info(`Confirmation email already sent for order ${order.id}; skipping`);
+        return;
+      }
 
       const updateData: OrderUpdateData = {
         payment_status: 'completed',
@@ -195,11 +210,9 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
             populate: { cart_items: true },
           });
           if (cart) {
-            // Delete all cart items
             for (const item of cart.cart_items || []) {
               await strapi.entityService.delete('api::cart-item.cart-item', item.id);
             }
-            // Delete the cart itself
             await strapi.entityService.delete('api::cart.cart', cartId);
             strapi.log.info(`Deleted cart ${cartId} and its items after successful payment`);
           }
@@ -220,6 +233,10 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
         }) as Order;
 
         await this.sendConfirmationEmail(updatedOrder);
+
+        await strapi.entityService.update('api::order.order', order.id, {
+          data: { confirmation_email_sent: true },
+        });
       } catch (error) {
         strapi.log.error(`Error processing payment_intent.succeeded for order ${order.id}: ${error.message}`);
         throw error;
@@ -289,6 +306,10 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
         strapi.log.info(`Order ${order.id} already completed; skipping`);
         return;
       }
+      if (order.confirmation_email_sent) {
+        strapi.log.info(`Confirmation email already sent for order ${order.id}; skipping`);
+        return;
+      }
 
       const updateData: OrderUpdateData = {
         payment_status: 'completed',
@@ -316,6 +337,10 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
       }) as Order;
 
       await this.sendConfirmationEmail(updatedOrder);
+
+      await strapi.entityService.update('api::order.order', order.id, {
+        data: { confirmation_email_sent: true },
+      });
     } else {
       strapi.log.warn(`Unhandled event type: ${event_type}`);
     }
@@ -364,6 +389,7 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
       order_items: order.order_items.map((item) => ({
         product: item.product,
         price: parseFloat(item.price).toFixed(2),
+        base_price: parseFloat(item.base_price).toFixed(2),
         quantity: item.quantity,
         order_item_parts: item.order_item_parts.map((part) => ({
           product_part: part.product_part,
