@@ -41,10 +41,9 @@ export default factories.createCoreService('api::order.order', ({ strapi }) => (
     strapi.log.debug(`[Order Service] Tax: ${subtotalCents} * ${taxRate} = ${taxCents} cents`);
 
     const transactionFeeCents = order.transaction_fee; // Already in cents
-    const discountsCents = order.discount_total; // Already in cents
 
-    const totalCents = subtotalCents + shippingCents + taxCents + transactionFeeCents - discountsCents;
-    strapi.log.debug(`[Order Service] Total: ${totalCents} cents (subtotal=${subtotalCents}, shipping=${shippingCents}, tax=${taxCents}, fee=${transactionFeeCents}, discount=${discountsCents})`);
+    const totalCents = subtotalCents + shippingCents + taxCents + transactionFeeCents;
+    strapi.log.debug(`[Order Service] Total: ${totalCents} cents (subtotal=${subtotalCents}, shipping=${shippingCents}, tax=${taxCents}, fee=${transactionFeeCents})`);
 
     return totalCents;
   },

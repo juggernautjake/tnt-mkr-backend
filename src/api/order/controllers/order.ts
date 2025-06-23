@@ -145,7 +145,7 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
       }));
 
       const discountsCents = totalDiscountCents;
-      const calculatedTotalCents = subtotalCents + shippingCents + taxCents + transactionFeeCents - discountsCents;
+      const calculatedTotalCents = subtotalCents + shippingCents + taxCents + transactionFeeCents;
 
       const totalFromFrontendCents = data.total_amount;
       if (Math.abs(totalFromFrontendCents - calculatedTotalCents) > 1) {
