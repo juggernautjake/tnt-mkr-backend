@@ -1,10 +1,9 @@
 import { factories } from '@strapi/strapi';
 import Stripe from 'stripe';
 import Handlebars from 'handlebars';
-import { v4 as uuidv4 } from 'uuid';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2025-05-28.basil', // Updated to latest version
+  apiVersion: '2025-05-28.basil',
 });
 
 interface Order {
@@ -192,36 +191,17 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
 
         const cartId = event_data.metadata.cart_id;
         if (cartId) {
-          const cart = await strapi.entityService.findOne('api::cart.cart', cartId, {});
-          if (cart && cart.status === 'active') {
-            await strapi.entityService.update('api::cart.cart', cartId, {
-              data: { cart_items: [], total: 0, status: 'converted' },
-            });
-
-            let newGuestSession: string | null = order.user ? null : uuidv4();
-            if (!order.user) {
-              let existingCarts = await strapi.entityService.findMany('api::cart.cart', {
-                filters: { guest_session: newGuestSession },
-              });
-              while (existingCarts.length > 0) {
-                newGuestSession = uuidv4();
-                existingCarts = await strapi.entityService.findMany('api::cart.cart', {
-                  filters: { guest_session: newGuestSession },
-                });
-              }
+          const cart = await strapi.entityService.findOne('api::cart.cart', cartId, {
+            populate: { cart_items: true },
+          });
+          if (cart) {
+            // Delete all cart items
+            for (const item of cart.cart_items || []) {
+              await strapi.entityService.delete('api::cart-item.cart-item', item.id);
             }
-
-            const newCartData = {
-              total: 0,
-              status: 'active' as const,
-              user: order.user ? order.user.id : null,
-              guest_session: newGuestSession,
-            };
-
-            await strapi.entityService.create('api::cart.cart', {
-              data: newCartData,
-              populate: ['cart_items'],
-            });
+            // Delete the cart itself
+            await strapi.entityService.delete('api::cart.cart', cartId);
+            strapi.log.info(`Deleted cart ${cartId} and its items after successful payment`);
           }
         }
 
