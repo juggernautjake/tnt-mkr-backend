@@ -234,6 +234,9 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
 
         await this.sendConfirmationEmail(updatedOrder);
 
+        // New: Send notification to company email
+        await this.sendAdminNotification(updatedOrder);
+
         await strapi.entityService.update('api::order.order', order.id, {
           data: { confirmation_email_sent: true },
         });
@@ -338,6 +341,9 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
 
       await this.sendConfirmationEmail(updatedOrder);
 
+      // New: Send notification to company email
+      await this.sendAdminNotification(updatedOrder);
+
       await strapi.entityService.update('api::order.order', order.id, {
         data: { confirmation_email_sent: true },
       });
@@ -367,6 +373,27 @@ export default factories.createCoreService('api::webhook-event.webhook-event', (
       strapi.log.info(`Confirmation email sent to ${customerEmail} for order ${order.id}`);
     } catch (error) {
       strapi.log.error(`Failed to send email to ${customerEmail}: ${error.message}`);
+    }
+  },
+
+  // New method: Send notification to company email
+  async sendAdminNotification(order: Order) {
+    const companyEmail = 'customer-service@tnt-mkr.com'; // Or your Google group email if different
+
+    const orderData = this.transformOrderData(order);
+    const compiledTemplate = Handlebars.compile(ORDER_CONFIRMATION_TEMPLATE);
+    const html = compiledTemplate(orderData);
+
+    try {
+      await strapi.plugins['email'].services.email.send({
+        to: companyEmail,
+        from: 'TNT MKR <no-reply@tnt-mkr.com>',
+        subject: `New Order Received - #${order.order_number}`,
+        html,
+      });
+      strapi.log.info(`Admin notification email sent to ${companyEmail} for order ${order.id}`);
+    } catch (error) {
+      strapi.log.error(`Failed to send admin notification to ${companyEmail}: ${error.message}`);
     }
   },
 
