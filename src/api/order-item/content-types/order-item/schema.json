@@ -57,6 +57,11 @@
       "type": "relation",
       "relation": "manyToMany",
       "target": "api::promotion.promotion"
+    },
+    "is_additional_part": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indicates if this order item is for an individual part purchase rather than a full product."
     }
   }
 }

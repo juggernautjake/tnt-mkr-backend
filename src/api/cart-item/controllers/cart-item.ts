@@ -12,7 +12,7 @@ async function roundTo99Cents(price: number): Promise<number> {
   return dollars + 0.99;
 }
 
-async function calculateEffectivePrice(strapi: any, product: any): Promise<number> {
+async function calculateProductEffectivePrice(strapi: any, product: any): Promise<number> {
   const currentDate = new Date().toISOString().split('T')[0];
   let effectivePrice = product.default_price;
   const promotions = product.promotions.filter(promo => {
@@ -34,8 +34,23 @@ async function calculateEffectivePrice(strapi: any, product: any): Promise<numbe
   } else if (promotions.length === 0 && product.on_sale && product.discounted_price) {
     effectivePrice = product.discounted_price;
   }
-  // Return as a number, no toFixed(2) or Number() needed
   return effectivePrice;
+}
+
+async function calculatePartEffectivePrice(strapi: any, partId: number): Promise<{ basePrice: number; effectivePrice: number }> {
+  const part = await strapi.entityService.findOne('api::product-part.product-part', partId, {});
+  if (!part) {
+    throw new ValidationError('Invalid product part');
+  }
+  const basePrice = part.price;
+  let effectivePrice = part.discounted_price && part.discounted_price < part.price ? part.discounted_price : part.price;
+  
+  // Round to 99 cents if discounted
+  if (part.discounted_price && part.discounted_price < part.price) {
+    effectivePrice = await roundTo99Cents(effectivePrice);
+  }
+  
+  return { basePrice, effectivePrice };
 }
 
 export default factories.createCoreController('api::cart-item.cart-item', ({ strapi }) => ({
@@ -47,9 +62,19 @@ export default factories.createCoreController('api::cart-item.cart-item', ({ str
     strapi.log.info(`[Cart Item Create] Received request with data: ${JSON.stringify(data)}`);
     strapi.log.debug(`[Cart Item Create] User: ${user ? user.id : 'None'}, Session ID: ${sessionId}`);
 
-    if (!data || !data.cart || !data.product || !data.base_price || !data.effective_price) {
-      strapi.log.warn('[Cart Item Create] Missing required fields');
-      return ctx.badRequest('Cart ID, product, base_price, and effective_price are required');
+    // Validate required fields based on whether it's an additional part or full product
+    const isAdditionalPart = data.is_additional_part === true;
+
+    if (!data.cart || !data.product) {
+      strapi.log.warn('[Cart Item Create] Missing required fields: cart or product');
+      return ctx.badRequest('Cart ID and product are required');
+    }
+
+    // For full products, we need base_price and effective_price from frontend
+    // For additional parts, we calculate them from the part
+    if (!isAdditionalPart && (!data.base_price || !data.effective_price)) {
+      strapi.log.warn('[Cart Item Create] Missing required fields for full product');
+      return ctx.badRequest('base_price and effective_price are required for full product purchases');
     }
 
     const cart: any = await strapi.entityService.findOne('api::cart.cart', data.cart, {
@@ -74,15 +99,39 @@ export default factories.createCoreController('api::cart-item.cart-item', ({ str
       populate: ['promotions'],
     });
 
-    const effectivePrice = await calculateEffectivePrice(strapi, product);
-    const providedEffectivePrice = parseFloat(data.effective_price);
-    if (Math.abs(providedEffectivePrice - effectivePrice) > 0.01) {
-      strapi.log.warn(`[Cart Item Create] Effective price mismatch for product ${data.product}: provided=${providedEffectivePrice}, calculated=${effectivePrice}`);
-      throw new ValidationError(`Invalid effective price: Provided (${providedEffectivePrice}) does not match calculated (${effectivePrice})`);
+    if (!product) {
+      return ctx.badRequest('Product not found');
+    }
+
+    let basePrice: number;
+    let effectivePrice: number;
+
+    if (isAdditionalPart && data.customizations?.length === 1) {
+      // Individual part purchase - calculate price from the part
+      const partId = data.customizations[0].product_part.id;
+      const partPricing = await calculatePartEffectivePrice(strapi, partId);
+      basePrice = partPricing.basePrice;
+      effectivePrice = partPricing.effectivePrice;
+      
+      strapi.log.info(`[Cart Item Create] Additional part pricing - base: ${basePrice}, effective: ${effectivePrice}`);
+    } else {
+      // Full product purchase - validate provided prices
+      effectivePrice = await calculateProductEffectivePrice(strapi, product);
+      basePrice = parseFloat(data.base_price);
+      
+      const providedEffectivePrice = parseFloat(data.effective_price);
+      if (Math.abs(providedEffectivePrice - effectivePrice) > 0.01) {
+        strapi.log.warn(`[Cart Item Create] Effective price mismatch for product ${data.product}: provided=${providedEffectivePrice}, calculated=${effectivePrice}`);
+        throw new ValidationError(`Invalid effective price: Provided (${providedEffectivePrice}) does not match calculated (${effectivePrice})`);
+      }
     }
 
     const cartItems = cart.cart_items || [];
-    const existingItems = cartItems.filter((item: any) => item.product?.id === data.product);
+    const existingItems = cartItems.filter((item: any) => 
+      item.product?.id === data.product && 
+      (item.is_additional_part || false) === isAdditionalPart
+    );
+    
     const newCustomizations = (data.customizations || []).map((cust: any) => ({
       product_part: cust.product_part.id,
       color: cust.color.id,
@@ -105,8 +154,6 @@ export default factories.createCoreController('api::cart-item.cart-item', ({ str
         strapi.log.info(`[Cart Item Create] Updated item: ${JSON.stringify(updatedItem)}`);
         return this.transformResponse(updatedItem);
       } else {
-        const basePrice = parseFloat(data.base_price);
-        // Round to 2 decimal places, keeping it a number
         const roundedBasePrice = Math.round(basePrice * 100) / 100;
         const roundedEffectivePrice = Math.round(effectivePrice * 100) / 100;
 
@@ -117,6 +164,7 @@ export default factories.createCoreController('api::cart-item.cart-item', ({ str
             quantity: data.quantity || 1,
             base_price: roundedBasePrice,
             effective_price: roundedEffectivePrice,
+            is_additional_part: isAdditionalPart,
           },
           populate: ['product'],
         });

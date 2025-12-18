@@ -23,6 +23,7 @@ interface CartItem {
   quantity: number;
   price: string;
   effective_price: number;
+  is_additional_part?: boolean;
   colors?: Array<{ id: number; name: string }>;
   engravings?: any[];
   cart_item_parts?: Array<{ product_part: { id: number }; color: { id: number } }>;
@@ -36,6 +37,7 @@ interface OrderItemInput {
   engravings: any[];
   colors: number[];
   promotions: number[];
+  is_additional_part?: boolean;
 }
 
 interface OrderInput {
@@ -105,9 +107,18 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
         const product = await strapi.entityService.findOne('api::product.product', item.product, {
           populate: ['promotions'],
         });
-        const activePromotions = product.promotions.filter(
+        
+        // Find the matching cart item to get is_additional_part flag
+        const cartItem = item.cart_item_id
+          ? cart.cart_items.find((ci: CartItem) => ci.id.toString() === item.cart_item_id)
+          : cart.cart_items.find((ci: CartItem) => ci.product.id === item.product);
+        
+        // For additional parts, don't apply product-level promotions
+        const isAdditionalPart = cartItem?.is_additional_part || false;
+        const activePromotions = isAdditionalPart ? [] : product.promotions.filter(
           (promo: any) => promo.start_date <= currentDate && promo.end_date >= currentDate && promo.publishedAt
         );
+        
         const priceCents = item.price || Math.round(product.effective_price * 100);
         return {
           cart_item_id: item.cart_item_id,
@@ -117,6 +128,7 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
           engravings: item.engravings || [],
           colors: item.colors?.map((color: any) => color.id) || [],
           promotions: activePromotions.map((promo: any) => promo.id),
+          is_additional_part: isAdditionalPart,
         };
       }));
 
@@ -135,6 +147,21 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
       // Calculate total discount based on order items
       let totalDiscountCents = 0;
       const orderItemsWithBasePrice = await Promise.all(orderItemsData.map(async (item) => {
+        // For additional parts, get base price from the part itself
+        if (item.is_additional_part) {
+          // The base_price should already be correct from the cart item
+          // For additional parts, base_price comes from part.price
+          const cartItem = item.cart_item_id
+            ? cart.cart_items.find((ci: CartItem) => ci.id.toString() === item.cart_item_id)
+            : cart.cart_items.find((ci: CartItem) => ci.product.id === item.product && ci.is_additional_part);
+          
+          const basePriceCents = cartItem ? Math.round(parseFloat(cartItem.base_price) * 100) : item.price;
+          const itemDiscountCents = (basePriceCents - item.price) * item.quantity;
+          totalDiscountCents += itemDiscountCents > 0 ? itemDiscountCents : 0;
+          return { ...item, base_price: basePriceCents };
+        }
+        
+        // For full products, get base price from product.default_price
         const product = await strapi.entityService.findOne('api::product.product', item.product, {
           fields: ['default_price'],
         });
@@ -210,6 +237,12 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
         const product = await strapi.entityService.findOne('api::product.product', item.product, {
           fields: ['default_price', 'effective_price', 'units_sold'],
         });
+        
+        // Find the matching cart item to get is_additional_part flag and cart_item_parts
+        const cartItem = item.cart_item_id
+          ? cart.cart_items.find((ci: CartItem) => ci.id.toString() === item.cart_item_id)
+          : cart.cart_items.find((ci: CartItem) => ci.product.id === item.product);
+        
         const orderItem = await strapi.entityService.create('api::order-item.order-item', {
           data: {
             order: order.id,
@@ -220,12 +253,10 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
             colors: item.colors,
             engravings: item.engravings,
             promotions: item.promotions,
+            is_additional_part: item.is_additional_part || false,
           },
         });
 
-        const cartItem = item.cart_item_id
-          ? cart.cart_items.find((ci: CartItem) => ci.id.toString() === item.cart_item_id)
-          : cart.cart_items.find((ci: CartItem) => ci.product.id === item.product);
         if (cartItem && cartItem.cart_item_parts) {
           for (const cartItemPart of cartItem.cart_item_parts) {
             await strapi.entityService.create('api::order-item-part.order-item-part', {

@@ -5,18 +5,59 @@ import crypto from 'crypto';
 
 const { ApplicationError } = errors;
 
-async function calculateEffectivePrice(strapi: any, productId: number): Promise<number> {
+async function roundTo99Cents(price: number): Promise<number> {
+  const dollars = Math.floor(price);
+  const cents = price - dollars;
+  if (cents === 0.99) {
+    return price;
+  }
+  return dollars + 0.99;
+}
+
+async function calculateEffectivePriceForCartItem(strapi: any, item: any): Promise<number> {
+  // Check if this is an additional part purchase
+  if (item.is_additional_part && item.cart_item_parts && item.cart_item_parts.length === 1) {
+    const partData = item.cart_item_parts[0].product_part;
+    if (!partData?.id) {
+      return item.effective_price || 0;
+    }
+    
+    const part = await strapi.entityService.findOne('api::product-part.product-part', partData.id, {});
+    if (!part) {
+      return item.effective_price || 0;
+    }
+    
+    let effectivePrice = part.discounted_price && part.discounted_price < part.price 
+      ? part.discounted_price 
+      : part.price;
+    
+    if (part.discounted_price && part.discounted_price < part.price) {
+      effectivePrice = await roundTo99Cents(effectivePrice);
+    }
+    
+    return Number(effectivePrice.toFixed(2));
+  }
+  
+  // Full product purchase
+  if (!item.product?.id) {
+    return item.effective_price || 0;
+  }
+  
   const currentDate = new Date().toISOString().split('T')[0];
   
-  const product = await strapi.entityService.findOne('api::product.product', productId, {
+  const product = await strapi.entityService.findOne('api::product.product', item.product.id, {
     populate: ['promotions'],
   });
+
+  if (!product) {
+    return item.effective_price || 0;
+  }
 
   let effectivePrice = product.default_price;
   
   const promotions = await strapi.db.query('api::promotion.promotion').findMany({
     where: {
-      products: { id: productId },
+      products: { id: item.product.id },
       start_date: { $lte: currentDate },
       end_date: { $gte: currentDate },
       publishedAt: { $ne: null },
@@ -97,7 +138,7 @@ export default factories.createCoreController("api::cart.cart", ({ strapi }) => 
         const cartItems = cart.cart_items || [];
         const total = await cartItems.reduce(async (sumPromise: Promise<number>, item: any) => {
           const sum = await sumPromise;
-          const effectivePrice = await calculateEffectivePrice(strapi, item.product.id);
+          const effectivePrice = await calculateEffectivePriceForCartItem(strapi, item);
           return sum + effectivePrice * (item.quantity || 1);
         }, Promise.resolve(0));
 
@@ -129,7 +170,7 @@ export default factories.createCoreController("api::cart.cart", ({ strapi }) => 
         const cartItems = cart.cart_items || [];
         const total = await cartItems.reduce(async (sumPromise: Promise<number>, item: any) => {
           const sum = await sumPromise;
-          const effectivePrice = await calculateEffectivePrice(strapi, item.product.id);
+          const effectivePrice = await calculateEffectivePriceForCartItem(strapi, item);
           return sum + effectivePrice * (item.quantity || 1);
         }, Promise.resolve(0));
 
@@ -176,7 +217,8 @@ export default factories.createCoreController("api::cart.cart", ({ strapi }) => 
     if (data.cart_items) {
       const total = await data.cart_items.reduce(async (sumPromise: Promise<number>, item: any) => {
         const sum = await sumPromise;
-        const effectivePrice = await calculateEffectivePrice(strapi, item.product);
+        // Use the effective_price from the item data directly
+        const effectivePrice = item.effective_price || 0;
         return sum + effectivePrice * (item.quantity || 1);
       }, Promise.resolve(0));
       data.total = Number(total.toFixed(2));
@@ -202,7 +244,7 @@ export default factories.createCoreController("api::cart.cart", ({ strapi }) => 
     if (data.cart_items) {
       data.total = await data.cart_items.reduce(async (sumPromise: Promise<number>, item: any) => {
         const sum = await sumPromise;
-        const effectivePrice = await calculateEffectivePrice(strapi, item.product);
+        const effectivePrice = item.effective_price || 0;
         return sum + effectivePrice * (item.quantity || 1);
       }, Promise.resolve(0));
       data.total = Number(data.total.toFixed(2));
@@ -279,7 +321,7 @@ export default factories.createCoreController("api::cart.cart", ({ strapi }) => 
       const cartItems = cart.cart_items || [];
       const total = await cartItems.reduce(async (sumPromise: Promise<number>, item: any) => {
         const sum = await sumPromise;
-        const effectivePrice = await calculateEffectivePrice(strapi, item.product.id);
+        const effectivePrice = await calculateEffectivePriceForCartItem(strapi, item);
         return sum + effectivePrice * (item.quantity || 1);
       }, Promise.resolve(0));
 
