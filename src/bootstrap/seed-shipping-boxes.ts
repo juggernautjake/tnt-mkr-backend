@@ -1,10 +1,13 @@
 const SHIPPING_BOXES = [
+  // Small boxes (priority 1-6) - $1.00 handling fee
   { name: '4x4x2', length: 4, width: 4, height: 2, empty_weight_oz: 1.5, max_weight_oz: 320, priority: 1 },
   { name: '5x5x2', length: 5, width: 5, height: 2, empty_weight_oz: 2, max_weight_oz: 400, priority: 2 },
   { name: '6x4x2', length: 6, width: 4, height: 2, empty_weight_oz: 2, max_weight_oz: 400, priority: 3 },
   { name: '6x6x2', length: 6, width: 6, height: 2, empty_weight_oz: 2.5, max_weight_oz: 480, priority: 4 },
   { name: '7x5x2', length: 7, width: 5, height: 2, empty_weight_oz: 2.5, max_weight_oz: 480, priority: 5 },
   { name: '8x6x2', length: 8, width: 6, height: 2, empty_weight_oz: 3, max_weight_oz: 560, priority: 6 },
+  
+  // Medium boxes (priority 7-19) - $2.25 handling fee
   { name: '6x6x4', length: 6, width: 6, height: 4, empty_weight_oz: 4, max_weight_oz: 640, priority: 7 },
   { name: '8x6x4', length: 8, width: 6, height: 4, empty_weight_oz: 5, max_weight_oz: 720, priority: 8 },
   { name: '8x8x4', length: 8, width: 8, height: 4, empty_weight_oz: 6, max_weight_oz: 800, priority: 9 },
@@ -18,6 +21,8 @@ const SHIPPING_BOXES = [
   { name: '10x10x6', length: 10, width: 10, height: 6, empty_weight_oz: 10, max_weight_oz: 1040, priority: 17 },
   { name: '12x10x6', length: 12, width: 10, height: 6, empty_weight_oz: 12, max_weight_oz: 1120, priority: 18 },
   { name: '12x12x6', length: 12, width: 12, height: 6, empty_weight_oz: 14, max_weight_oz: 1120, priority: 19 },
+  
+  // Large boxes (priority 20-30) - $4.00 handling fee
   { name: '10x10x8', length: 10, width: 10, height: 8, empty_weight_oz: 14, max_weight_oz: 1120, priority: 20 },
   { name: '12x10x8', length: 12, width: 10, height: 8, empty_weight_oz: 16, max_weight_oz: 1120, priority: 21 },
   { name: '12x12x8', length: 12, width: 12, height: 8, empty_weight_oz: 18, max_weight_oz: 1120, priority: 22 },
@@ -55,6 +60,7 @@ export async function seedShippingBoxes(strapi: any): Promise<void> {
     }
 
     strapi.log.info(`Successfully seeded ${SHIPPING_BOXES.length} shipping boxes`);
+    strapi.log.info('Box categories: Small (priority 1-6, $1.00), Medium (priority 7-19, $2.25), Large (priority 20-30, $4.00)');
   } catch (error) {
     strapi.log.error('Error seeding shipping boxes:', error);
   }

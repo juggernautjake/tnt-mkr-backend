@@ -25,6 +25,144 @@ async function isAdmin(ctx: Context): Promise<boolean> {
   }
 }
 
+// Helper function for sending shipping notification
+async function sendShippingNotification(strapi: any, order: any) {
+  const customerEmail = order.customer_email || order.guest_email || order.user?.email;
+  
+  if (!customerEmail) {
+    strapi.log.warn(`No email available for shipping notification - order ${order.id}`);
+    return;
+  }
+
+  const trackingNumber = order.tracking_number;
+  if (!trackingNumber) {
+    strapi.log.warn(`No tracking number for order ${order.id}`);
+    return;
+  }
+
+  const trackingUrl = `https://tools.usps.com/go/TrackConfirmAction?tLabels=${trackingNumber}`;
+
+  let estimatedDelivery = '';
+  let showDelivery = 'none';
+  if (order.estimated_delivery_date) {
+    const date = new Date(order.estimated_delivery_date);
+    estimatedDelivery = date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+    showDelivery = 'block';
+  }
+
+  const shippingAddress = order.shipping_address || {};
+  const addressParts = [
+    shippingAddress.street,
+    shippingAddress.street2,
+    `${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.postal_code}`,
+  ].filter(Boolean);
+  const formattedAddress = addressParts.join('<br>');
+  
+  // Build items HTML
+  let itemsHtml = '';
+  for (const item of order.order_items || []) {
+    const productName = item.product?.name || 'Product';
+    const quantity = item.quantity || 1;
+    
+    let partsHtml = '';
+    for (const part of item.order_item_parts || []) {
+      const partName = part.product_part?.name || 'Part';
+      const colorName = part.color?.name || 'Color';
+      partsHtml += `<div style="margin-top: 5px; font-size: 14px; color: #666;">${partName}: ${colorName}</div>`;
+    }
+    
+    itemsHtml += `
+      <div style="border-bottom: 1px solid #ddd; padding: 10px 0;">
+        <div style="font-weight: bold; color: #333;">${productName} × ${quantity}</div>
+        ${partsHtml}
+      </div>
+    `;
+  }
+
+  const shipDate = order.shipped_at
+    ? new Date(order.shipped_at).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { background-color: #fefaf0; font-family: 'Roboto', sans-serif; color: #333; margin: 0; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 8px 16px rgba(0, 0, 0, 0.25); border: 3px solid; border-image: linear-gradient(45deg, #fe5100, white, #fe5100) 1; }
+    h1 { color: #fe5100; font-size: 30px; font-weight: bold; margin-bottom: 20px; text-align: center; }
+    p { margin: 10px 0; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Your Order Has Shipped! 📦</h1>
+    <p style="text-align: center; margin-bottom: 20px;">Great news! Your order is on its way.</p>
+    
+    <div style="background-color: #f5f5f5; border: 2px solid #fe5100; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
+      <p style="margin: 0 0 10px 0; font-size: 14px; color: #666;">Your Tracking Number:</p>
+      <div style="font-size: 24px; font-weight: bold; color: #fe5100; letter-spacing: 2px;">${trackingNumber}</div>
+      <a href="${trackingUrl}" style="display: inline-block; margin-top: 15px; padding: 10px 20px; background-color: #fe5100; color: white; text-decoration: none; border-radius: 25px; font-weight: bold;" target="_blank">Track Your Package</a>
+    </div>
+
+    <div style="background-color: #e8f5e9; border-radius: 8px; padding: 15px; margin: 20px 0; text-align: center; display: ${showDelivery};">
+      <p style="margin: 0 0 5px 0; font-size: 14px; color: #666;">Estimated Delivery:</p>
+      <div style="font-size: 18px; font-weight: bold; color: #2e7d32;">${estimatedDelivery}</div>
+    </div>
+
+    <div style="border-top: 1px solid #ddd; padding-top: 15px; margin-bottom: 20px;">
+      <p><strong>Order Number:</strong> ${order.order_number || ''}</p>
+      <p><strong>Carrier:</strong> ${order.carrier_service || 'USPS'}</p>
+      <p><strong>Ship Date:</strong> ${shipDate}</p>
+      <p><strong>Shipping to:</strong><br>
+        ${order.customer_name || ''}<br>
+        ${formattedAddress}
+      </p>
+    </div>
+
+    <div style="margin-top: 20px;">
+      <h2 style="font-size: 20px; font-weight: bold; color: #333; margin-bottom: 10px;">Items in This Shipment</h2>
+      ${itemsHtml}
+    </div>
+
+    <p style="margin-top: 20px;">If you have any questions about your order, please don't hesitate to contact us.</p>
+    
+    <div style="margin-top: 20px; font-size: 12px; color: #555; text-align: center;">
+      <p>Thank you for shopping with TNT MKR!</p>
+      <p>© TNT MKR. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+`;
+
+  try {
+    await strapi.plugins['email'].services.email.send({
+      to: customerEmail,
+      from: process.env.DEFAULT_FROM_EMAIL || 'TNT MKR <no-reply@tnt-mkr.com>',
+      subject: `Your TNT MKR Order Has Shipped! - ${order.order_number}`,
+      html,
+    });
+    strapi.log.info(`Shipping notification sent to ${customerEmail} for order ${order.id}`);
+  } catch (error: any) {
+    strapi.log.error(`Failed to send shipping notification to ${customerEmail}: ${error.message}`);
+    throw error;
+  }
+}
+
 export default {
   // Validate an address
   async validateAddress(ctx: Context) {
@@ -596,141 +734,3 @@ export default {
     }
   },
 };
-
-// Helper function for sending shipping notification (moved outside the export)
-async function sendShippingNotification(strapi: any, order: any) {
-  const customerEmail = order.customer_email || order.guest_email || order.user?.email;
-  
-  if (!customerEmail) {
-    strapi.log.warn(`No email available for shipping notification - order ${order.id}`);
-    return;
-  }
-
-  const trackingNumber = order.tracking_number;
-  if (!trackingNumber) {
-    strapi.log.warn(`No tracking number for order ${order.id}`);
-    return;
-  }
-
-  const trackingUrl = `https://tools.usps.com/go/TrackConfirmAction?tLabels=${trackingNumber}`;
-
-  let estimatedDelivery = '';
-  let showDelivery = 'none';
-  if (order.estimated_delivery_date) {
-    const date = new Date(order.estimated_delivery_date);
-    estimatedDelivery = date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-    showDelivery = 'block';
-  }
-
-  const shippingAddress = order.shipping_address || {};
-  const addressParts = [
-    shippingAddress.street,
-    shippingAddress.street2,
-    `${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.postal_code}`,
-  ].filter(Boolean);
-  const formattedAddress = addressParts.join('<br>');
-  
-  // Build items HTML
-  let itemsHtml = '';
-  for (const item of order.order_items || []) {
-    const productName = item.product?.name || 'Product';
-    const quantity = item.quantity || 1;
-    
-    let partsHtml = '';
-    for (const part of item.order_item_parts || []) {
-      const partName = part.product_part?.name || 'Part';
-      const colorName = part.color?.name || 'Color';
-      partsHtml += `<div style="margin-top: 5px; font-size: 14px; color: #666;">${partName}: ${colorName}</div>`;
-    }
-    
-    itemsHtml += `
-      <div style="border-bottom: 1px solid #ddd; padding: 10px 0;">
-        <div style="font-weight: bold; color: #333;">${productName} × ${quantity}</div>
-        ${partsHtml}
-      </div>
-    `;
-  }
-
-  const shipDate = order.shipped_at
-    ? new Date(order.shipped_at).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      })
-    : new Date().toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      });
-
-  const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    body { background-color: #fefaf0; font-family: 'Roboto', sans-serif; color: #333; margin: 0; padding: 20px; }
-    .container { max-width: 600px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 8px 16px rgba(0, 0, 0, 0.25); border: 3px solid; border-image: linear-gradient(45deg, #fe5100, white, #fe5100) 1; }
-    h1 { color: #fe5100; font-size: 30px; font-weight: bold; margin-bottom: 20px; text-align: center; }
-    p { margin: 10px 0; font-size: 16px; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>Your Order Has Shipped! 📦</h1>
-    <p style="text-align: center; margin-bottom: 20px;">Great news! Your order is on its way.</p>
-    
-    <div style="background-color: #f5f5f5; border: 2px solid #fe5100; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
-      <p style="margin: 0 0 10px 0; font-size: 14px; color: #666;">Your Tracking Number:</p>
-      <div style="font-size: 24px; font-weight: bold; color: #fe5100; letter-spacing: 2px;">${trackingNumber}</div>
-      <a href="${trackingUrl}" style="display: inline-block; margin-top: 15px; padding: 10px 20px; background-color: #fe5100; color: white; text-decoration: none; border-radius: 25px; font-weight: bold;" target="_blank">Track Your Package</a>
-    </div>
-
-    <div style="background-color: #e8f5e9; border-radius: 8px; padding: 15px; margin: 20px 0; text-align: center; display: ${showDelivery};">
-      <p style="margin: 0 0 5px 0; font-size: 14px; color: #666;">Estimated Delivery:</p>
-      <div style="font-size: 18px; font-weight: bold; color: #2e7d32;">${estimatedDelivery}</div>
-    </div>
-
-    <div style="border-top: 1px solid #ddd; padding-top: 15px; margin-bottom: 20px;">
-      <p><strong>Order Number:</strong> ${order.order_number || ''}</p>
-      <p><strong>Carrier:</strong> ${order.carrier_service || 'USPS'}</p>
-      <p><strong>Ship Date:</strong> ${shipDate}</p>
-      <p><strong>Shipping to:</strong><br>
-        ${order.customer_name || ''}<br>
-        ${formattedAddress}
-      </p>
-    </div>
-
-    <div style="margin-top: 20px;">
-      <h2 style="font-size: 20px; font-weight: bold; color: #333; margin-bottom: 10px;">Items in This Shipment</h2>
-      ${itemsHtml}
-    </div>
-
-    <p style="margin-top: 20px;">If you have any questions about your order, please don't hesitate to contact us.</p>
-    
-    <div style="margin-top: 20px; font-size: 12px; color: #555; text-align: center;">
-      <p>Thank you for shopping with TNT MKR!</p>
-      <p>© TNT MKR. All rights reserved.</p>
-    </div>
-  </div>
-</body>
-</html>
-`;
-
-  try {
-    await strapi.plugins['email'].services.email.send({
-      to: customerEmail,
-      from: process.env.DEFAULT_FROM_EMAIL || 'TNT MKR <no-reply@tnt-mkr.com>',
-      subject: `Your TNT MKR Order Has Shipped! - ${order.order_number}`,
-      html,
-    });
-    strapi.log.info(`Shipping notification sent to ${customerEmail} for order ${order.id}`);
-  } catch (error: any) {
-    strapi.log.error(`Failed to send shipping notification to ${customerEmail}: ${error.message}`);
-    throw error;
-  }
-}

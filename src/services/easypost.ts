@@ -1,41 +1,26 @@
-import EasyPostClient from '@easypost/api';
+import EasyPost from '@easypost/api';
 
-const getClient = () => {
-  const apiKey = process.env.NODE_ENV === 'production'
-    ? process.env.EASYPOST_PRODUCTION_API_KEY
-    : process.env.EASYPOST_TEST_API_KEY;
+const apiKey = process.env.EASYPOST_API_KEY || '';
+const testMode = process.env.NODE_ENV !== 'production' || process.env.EASYPOST_TEST_MODE === 'true';
 
-  if (!apiKey) {
-    throw new Error('EasyPost API key not configured');
-  }
+let client: any = null;
 
-  return new EasyPostClient(apiKey);
-};
+if (apiKey) {
+  client = new EasyPost(apiKey);
+}
 
-// Continental US states only (excludes AK, HI, territories)
+// States we ship to (continental US only)
 const CONTINENTAL_US_STATES = [
-  'AL', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
-  'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
-  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH',
-  'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA',
-  'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA',
-  'WV', 'WI', 'WY', 'DC'
+  'AL', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA',
+  'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA',
+  'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM',
+  'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD',
+  'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
 ];
 
-export const isValidContinentalUS = (state: string): boolean => {
-  return CONTINENTAL_US_STATES.includes(state.toUpperCase());
-};
+// Non-continental states and territories we don't ship to
+const NON_CONTINENTAL = ['AK', 'HI', 'PR', 'VI', 'GU', 'AS', 'MP'];
 
-export const getOriginAddress = () => ({
-  street1: process.env.ORIGIN_STREET || '',
-  city: process.env.ORIGIN_CITY || 'Belton',
-  state: process.env.ORIGIN_STATE || 'TX',
-  zip: process.env.ORIGIN_ZIP || '76513',
-  country: 'US',
-  phone: process.env.ORIGIN_PHONE || '',
-});
-
-// Exported interfaces for use in other services
 export interface AddressInput {
   street: string;
   street2?: string;
@@ -46,13 +31,6 @@ export interface AddressInput {
 }
 
 export interface ValidatedAddress {
-  street: string;
-  street2?: string;
-  city: string;
-  state: string;
-  postal_code: string;
-  country: string;
-  phone?: string;
   is_valid: boolean;
   easypost_id?: string;
   suggested_address?: {
@@ -62,132 +40,141 @@ export interface ValidatedAddress {
     state: string;
     postal_code: string;
   };
+  error?: string;
 }
 
 export interface PackageInfo {
-  weight_oz: number;
   length: number;
   width: number;
   height: number;
+  weight_oz: number;
+  box_name?: string;
+  box_priority?: number;
 }
 
 export interface ShippingRate {
   id: string;
   carrier: string;
   service: string;
-  rate_cents: number;
-  rate_with_handling_cents: number;
-  estimated_delivery_days: number | null;
-  estimated_delivery_date: string | null;
-  delivery_guarantee: boolean;
+  rate: string;
+  est_delivery_days: number | null;
+  delivery_date: string | null;
+  delivery_date_guaranteed: boolean;
 }
 
 export interface RateResponse {
   rates: ShippingRate[];
-  shipment_id?: string;
-  cached?: boolean;
-  cache_key?: string;
+  shipment_id: string;
 }
 
-export const validateAddress = async (address: AddressInput): Promise<ValidatedAddress> => {
-  // Check if state is continental US
+// Check if state is continental US
+function isValidContinentalUS(state: string): boolean {
+  return CONTINENTAL_US_STATES.includes(state.toUpperCase());
+}
+
+// Validate address with EasyPost
+async function validateAddress(address: AddressInput): Promise<ValidatedAddress> {
+  if (!client) {
+    return { is_valid: false, error: 'EasyPost not configured' };
+  }
+
+  // Check continental US first
   if (!isValidContinentalUS(address.state)) {
     return {
-      ...address,
-      country: 'US',
       is_valid: false,
+      error: 'We currently only ship to the continental United States (excludes Alaska, Hawaii, and US territories).',
     };
   }
 
   try {
-    const client = getClient();
-
-    const easypostAddress = await client.Address.create({
+    const verifiedAddress = await client.Address.create({
       street1: address.street,
       street2: address.street2 || '',
       city: address.city,
       state: address.state,
       zip: address.postal_code,
       country: 'US',
-      phone: address.phone || '',
+      verify: ['delivery'],
     });
 
-    const verifiedAddress = await client.Address.verifyAddress(easypostAddress.id);
+    // Check verification results
+    const verifications = verifiedAddress.verifications;
+    if (verifications?.delivery?.success) {
+      // Check if address was modified
+      const wasModified = 
+        verifiedAddress.street1?.toUpperCase() !== address.street.toUpperCase() ||
+        verifiedAddress.city?.toUpperCase() !== address.city.toUpperCase() ||
+        verifiedAddress.state?.toUpperCase() !== address.state.toUpperCase() ||
+        verifiedAddress.zip !== address.postal_code;
 
-    // Check if address was corrected
-    const wasModified =
-      verifiedAddress.street1?.toUpperCase() !== address.street.toUpperCase() ||
-      verifiedAddress.city?.toUpperCase() !== address.city.toUpperCase() ||
-      verifiedAddress.state?.toUpperCase() !== address.state.toUpperCase() ||
-      verifiedAddress.zip?.substring(0, 5) !== address.postal_code.substring(0, 5);
+      if (wasModified) {
+        return {
+          is_valid: true,
+          easypost_id: verifiedAddress.id,
+          suggested_address: {
+            street: verifiedAddress.street1,
+            street2: verifiedAddress.street2 || '',
+            city: verifiedAddress.city,
+            state: verifiedAddress.state,
+            postal_code: verifiedAddress.zip,
+          },
+        };
+      }
 
-    const result: ValidatedAddress = {
-      street: verifiedAddress.street1 || address.street,
-      street2: verifiedAddress.street2 || address.street2,
-      city: verifiedAddress.city || address.city,
-      state: verifiedAddress.state || address.state,
-      postal_code: verifiedAddress.zip || address.postal_code,
-      country: 'US',
-      phone: address.phone,
-      is_valid: true,
-      easypost_id: verifiedAddress.id,
-    };
-
-    if (wasModified) {
-      result.suggested_address = {
-        street: verifiedAddress.street1 || '',
-        street2: verifiedAddress.street2 || '',
-        city: verifiedAddress.city || '',
-        state: verifiedAddress.state || '',
-        postal_code: verifiedAddress.zip || '',
+      return {
+        is_valid: true,
+        easypost_id: verifiedAddress.id,
       };
     }
 
-    return result;
+    // Get error message from verification
+    const errors = verifications?.delivery?.errors || [];
+    const errorMessage = errors.length > 0 
+      ? errors.map((e: any) => e.message).join('. ')
+      : 'Address could not be verified';
+
+    return {
+      is_valid: false,
+      error: errorMessage,
+    };
   } catch (error: any) {
     console.error('EasyPost address validation error:', error);
     return {
-      ...address,
-      country: 'US',
       is_valid: false,
+      error: error.message || 'Failed to validate address',
     };
   }
-};
+}
 
-const HANDLING_FEE_CENTS = 100; // $1.00 handling fee per package
-
-// Services we want to offer
-const ALLOWED_SERVICES = [
-  'GroundAdvantage',
-  'Ground Advantage',
-  'Priority',
-  'PriorityMailExpress',
-  'Express',
-];
-
-export const getShippingRates = async (
+// Get shipping rates from EasyPost
+async function getRates(
   toAddress: AddressInput,
   packages: PackageInfo[]
-): Promise<RateResponse> => {
+): Promise<RateResponse> {
+  if (!client) {
+    throw new Error('EasyPost not configured');
+  }
+
+  // From address (your business)
+  const fromAddress = {
+    company: 'TNT MKR',
+    street1: process.env.BUSINESS_ADDRESS_STREET || '123 Main St',
+    city: process.env.BUSINESS_ADDRESS_CITY || 'Belton',
+    state: process.env.BUSINESS_ADDRESS_STATE || 'TX',
+    zip: process.env.BUSINESS_ADDRESS_ZIP || '76513',
+    country: 'US',
+    phone: process.env.BUSINESS_PHONE || '2545551234',
+  };
+
+  // For now, we'll just use the first/largest package
+  // In production, you might create multiple shipments for multiple packages
+  const primaryPackage = packages.reduce((largest, pkg) => 
+    (pkg.weight_oz > largest.weight_oz) ? pkg : largest
+  , packages[0]);
+
   try {
-    const client = getClient();
-    const origin = getOriginAddress();
-
-    // For now, we only support single-package shipments
-    const pkg = packages[0];
-    if (!pkg) {
-      throw new Error('No package dimensions provided');
-    }
-
     const shipment = await client.Shipment.create({
-      from_address: {
-        street1: origin.street1,
-        city: origin.city,
-        state: origin.state,
-        zip: origin.zip,
-        country: origin.country,
-        phone: origin.phone,
-      },
+      from_address: fromAddress,
       to_address: {
         street1: toAddress.street,
         street2: toAddress.street2 || '',
@@ -198,65 +185,78 @@ export const getShippingRates = async (
         phone: toAddress.phone || '',
       },
       parcel: {
-        weight: pkg.weight_oz,
-        length: pkg.length,
-        width: pkg.width,
-        height: pkg.height,
+        length: primaryPackage.length,
+        width: primaryPackage.width,
+        height: primaryPackage.height,
+        weight: primaryPackage.weight_oz, // EasyPost uses ounces
+      },
+      options: {
+        // Request specific USPS services
+        carrier_accounts: [], // Leave empty to get all available carriers
       },
     });
 
-    // Filter and format rates
-    const rates: ShippingRate[] = (shipment.rates || [])
-      .filter((rate: any) => {
-        // Only USPS for now
-        if (rate.carrier !== 'USPS') return false;
-        // Only allowed services
-        return ALLOWED_SERVICES.some(svc =>
-          rate.service?.includes(svc) || rate.service === svc
-        );
-      })
-      .map((rate: any) => {
-        const rateCents = Math.round(parseFloat(rate.rate) * 100);
-        return {
-          id: rate.id,
-          carrier: rate.carrier,
-          service: rate.service,
-          rate_cents: rateCents,
-          rate_with_handling_cents: rateCents + HANDLING_FEE_CENTS,
-          estimated_delivery_days: rate.delivery_days || null,
-          estimated_delivery_date: rate.delivery_date || null,
-          delivery_guarantee: rate.delivery_date_guaranteed || false,
-        };
-      })
-      .sort((a: ShippingRate, b: ShippingRate) => a.rate_cents - b.rate_cents);
+    // Filter to only USPS rates and specific services we want
+    const uspsServices = [
+      'GroundAdvantage',
+      'Ground Advantage',
+      'Priority',
+      'Express',
+    ];
+
+    const filteredRates = shipment.rates
+      .filter((rate: any) => rate.carrier === 'USPS')
+      .filter((rate: any) => 
+        uspsServices.some(service => 
+          rate.service.toLowerCase().includes(service.toLowerCase())
+        )
+      )
+      .map((rate: any) => ({
+        id: rate.id,
+        carrier: rate.carrier,
+        service: rate.service,
+        rate: rate.rate,
+        est_delivery_days: rate.est_delivery_days,
+        delivery_date: rate.delivery_date,
+        delivery_date_guaranteed: rate.delivery_date_guaranteed || false,
+      }));
 
     return {
-      rates,
+      rates: filteredRates,
       shipment_id: shipment.id,
     };
   } catch (error: any) {
     console.error('EasyPost get rates error:', error);
     throw error;
   }
-};
+}
 
-export const createTracker = async (trackingCode: string, carrier: string = 'USPS'): Promise<string> => {
+// Create a tracker for a shipment
+async function createTracker(trackingNumber: string, carrier: string = 'USPS'): Promise<string> {
+  if (!client) {
+    throw new Error('EasyPost not configured');
+  }
+
   try {
-    const client = getClient();
     const tracker = await client.Tracker.create({
-      tracking_code: trackingCode,
+      tracking_code: trackingNumber,
       carrier: carrier,
     });
+
     return tracker.id;
   } catch (error: any) {
     console.error('EasyPost create tracker error:', error);
     throw error;
   }
-};
+}
 
-export const getTrackerStatus = async (trackerId: string): Promise<any> => {
+// Get tracker status
+async function getTrackerStatus(trackerId: string): Promise<any> {
+  if (!client) {
+    throw new Error('EasyPost not configured');
+  }
+
   try {
-    const client = getClient();
     const tracker = await client.Tracker.retrieve(trackerId);
     return {
       status: tracker.status,
@@ -268,13 +268,12 @@ export const getTrackerStatus = async (trackerId: string): Promise<any> => {
     console.error('EasyPost get tracker error:', error);
     throw error;
   }
-};
+}
 
 export default {
+  isValidContinentalUS,
   validateAddress,
-  getShippingRates,
+  getRates,
   createTracker,
   getTrackerStatus,
-  isValidContinentalUS,
-  getOriginAddress,
 };
