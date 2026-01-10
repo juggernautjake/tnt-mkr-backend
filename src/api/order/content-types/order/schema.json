@@ -195,6 +195,11 @@
     "google_sheet_row": {
       "type": "integer",
       "description": "Row number in Google Sheet for this order"
+    },
+    "admin_hidden": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, order is hidden from admin orders page but still visible in Strapi"
     }
   }
 }
