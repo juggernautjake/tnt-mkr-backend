@@ -1,59 +1,76 @@
 {
-    "kind": "collectionType",
-    "collectionName": "addresses",
-    "info": {
-      "singularName": "address",
-      "pluralName": "addresses",
-      "displayName": "Address"
+  "kind": "collectionType",
+  "collectionName": "addresses",
+  "info": {
+    "singularName": "address",
+    "pluralName": "addresses",
+    "displayName": "Address",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "label": {
+      "type": "string"
     },
-    "options": {
-      "draftAndPublish": true
+    "street": {
+      "type": "string",
+      "required": true
     },
-    "attributes": {
-      "label": {
-        "type": "string"
-      },
-      "street": {
-        "type": "string",
-        "required": true
-      },
-      "city": {
-        "type": "string",
-        "required": true
-      },
-      "state": {
-        "type": "string"
-      },
-      "postal_code": {
-        "type": "string",
-        "required": true
-      },
-      "country": {
-        "type": "string",
-        "required": true,
-        "default": "USA"
-      },
-      "is_billing": {
-        "type": "boolean",
-        "default": false
-      },
-      "is_shipping": {
-        "type": "boolean",
-        "default": false
-      },
-      "is_default_billing": {
-        "type": "boolean",
-        "default": false
-      },
-      "is_default_shipping": {
-        "type": "boolean",
-        "default": false
-      },
-      "user": {
-        "type": "relation",
-        "relation": "manyToOne",
-        "target": "plugin::users-permissions.user"
-      }
+    "street2": {
+      "type": "string",
+      "description": "Apartment, suite, unit, etc."
+    },
+    "city": {
+      "type": "string",
+      "required": true
+    },
+    "state": {
+      "type": "string",
+      "required": true
+    },
+    "postal_code": {
+      "type": "string",
+      "required": true
+    },
+    "country": {
+      "type": "string",
+      "required": true,
+      "default": "US"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "is_billing": {
+      "type": "boolean",
+      "default": false
+    },
+    "is_shipping": {
+      "type": "boolean",
+      "default": false
+    },
+    "is_default_billing": {
+      "type": "boolean",
+      "default": false
+    },
+    "is_default_shipping": {
+      "type": "boolean",
+      "default": false
+    },
+    "is_validated": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether address was validated by EasyPost"
+    },
+    "easypost_id": {
+      "type": "string",
+      "description": "EasyPost address ID for validated addresses"
+    },
+    "user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
     }
   }
-  
+}

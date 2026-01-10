@@ -365,6 +365,7 @@ export interface AdminUser extends Schema.CollectionType {
 export interface ApiAddressAddress extends Schema.CollectionType {
   collectionName: 'addresses';
   info: {
+    description: '';
     displayName: 'Address';
     pluralName: 'addresses';
     singularName: 'address';
@@ -374,7 +375,7 @@ export interface ApiAddressAddress extends Schema.CollectionType {
   };
   attributes: {
     city: Attribute.String & Attribute.Required;
-    country: Attribute.String & Attribute.Required & Attribute.DefaultTo<'USA'>;
+    country: Attribute.String & Attribute.Required & Attribute.DefaultTo<'US'>;
     createdAt: Attribute.DateTime;
     createdBy: Attribute.Relation<
       'api::address.address',
@@ -382,15 +383,19 @@ export interface ApiAddressAddress extends Schema.CollectionType {
       'admin::user'
     > &
       Attribute.Private;
+    easypost_id: Attribute.String;
     is_billing: Attribute.Boolean & Attribute.DefaultTo<false>;
     is_default_billing: Attribute.Boolean & Attribute.DefaultTo<false>;
     is_default_shipping: Attribute.Boolean & Attribute.DefaultTo<false>;
     is_shipping: Attribute.Boolean & Attribute.DefaultTo<false>;
+    is_validated: Attribute.Boolean & Attribute.DefaultTo<false>;
     label: Attribute.String;
+    phone: Attribute.String;
     postal_code: Attribute.String & Attribute.Required;
     publishedAt: Attribute.DateTime;
-    state: Attribute.String;
+    state: Attribute.String & Attribute.Required;
     street: Attribute.String & Attribute.Required;
+    street2: Attribute.String;
     updatedAt: Attribute.DateTime;
     updatedBy: Attribute.Relation<
       'api::address.address',
@@ -916,6 +921,7 @@ export interface ApiOrderItemOrderItem extends Schema.CollectionType {
     > &
       Attribute.Private;
     engravings: Attribute.Component<'customization.engraving', true>;
+    is_additional_part: Attribute.Boolean & Attribute.DefaultTo<false>;
     order: Attribute.Relation<
       'api::order-item.order-item',
       'manyToOne',
@@ -968,11 +974,14 @@ export interface ApiOrderOrder extends Schema.CollectionType {
     draftAndPublish: false;
   };
   attributes: {
+    admin_notes: Attribute.Text;
     billing_address: Attribute.Relation<
       'api::order.order',
       'oneToOne',
       'api::address.address'
     >;
+    carrier_service: Attribute.String;
+    confirmation_email_sent: Attribute.Boolean & Attribute.DefaultTo<false>;
     createdAt: Attribute.DateTime;
     createdBy: Attribute.Relation<
       'api::order.order',
@@ -980,14 +989,21 @@ export interface ApiOrderOrder extends Schema.CollectionType {
       'admin::user'
     > &
       Attribute.Private;
+    customer_email: Attribute.Email;
     customer_name: Attribute.String & Attribute.Required;
     customer_phone: Attribute.String;
+    delivered_at: Attribute.DateTime;
     discount_code: Attribute.Relation<
       'api::order.order',
       'manyToOne',
       'api::discount-code.discount-code'
     >;
     discount_total: Attribute.Integer;
+    easypost_rate_id: Attribute.String;
+    easypost_shipment_id: Attribute.String;
+    easypost_tracker_id: Attribute.String;
+    estimated_delivery_date: Attribute.Date;
+    google_sheet_row: Attribute.Integer;
     guest_email: Attribute.Email;
     order_items: Attribute.Relation<
       'api::order.order',
@@ -996,20 +1012,42 @@ export interface ApiOrderOrder extends Schema.CollectionType {
     >;
     order_number: Attribute.String & Attribute.Required & Attribute.Unique;
     order_status: Attribute.Enumeration<
-      ['pending', 'paid', 'shipped', 'delivered', 'canceled', 'returned']
+      [
+        'pending',
+        'paid',
+        'processing',
+        'shipped',
+        'in_transit',
+        'out_for_delivery',
+        'delivered',
+        'canceled',
+        'returned'
+      ]
     > &
       Attribute.DefaultTo<'pending'>;
     ordered_at: Attribute.DateTime & Attribute.Required;
+    package_height: Attribute.Decimal;
+    package_length: Attribute.Decimal;
+    package_weight_oz: Attribute.Decimal;
+    package_width: Attribute.Decimal;
     payment_intent_id: Attribute.String;
     payment_last_four: Attribute.String;
     payment_method: Attribute.String;
-    payment_status: Attribute.Enumeration<['pending', 'completed', 'failed']> &
+    payment_status: Attribute.Enumeration<
+      ['pending', 'completed', 'failed', 'refunded']
+    > &
       Attribute.DefaultTo<'pending'>;
     sales_tax: Attribute.Integer;
+    shipped_at: Attribute.DateTime;
     shipping_address: Attribute.Relation<
       'api::order.order',
       'oneToOne',
       'api::address.address'
+    >;
+    shipping_box: Attribute.Relation<
+      'api::order.order',
+      'oneToOne',
+      'api::shipping-box.shipping-box'
     >;
     shipping_cost: Attribute.Integer;
     shipping_method: Attribute.Relation<
@@ -1017,6 +1055,7 @@ export interface ApiOrderOrder extends Schema.CollectionType {
       'oneToOne',
       'api::shipping-option.shipping-option'
     >;
+    shipping_notification_sent: Attribute.Boolean & Attribute.DefaultTo<false>;
     subtotal: Attribute.Integer & Attribute.Required;
     total_amount: Attribute.Integer & Attribute.Required;
     tracking_number: Attribute.String;
@@ -1039,6 +1078,7 @@ export interface ApiOrderOrder extends Schema.CollectionType {
 export interface ApiProductPartProductPart extends Schema.CollectionType {
   collectionName: 'product_parts';
   info: {
+    description: '';
     displayName: 'Product Part';
     pluralName: 'product-parts';
     singularName: 'product-part';
@@ -1061,7 +1101,9 @@ export interface ApiProductPartProductPart extends Schema.CollectionType {
       Attribute.Private;
     description: Attribute.Text;
     discounted_price: Attribute.Decimal;
+    height: Attribute.Decimal;
     is_full_case: Attribute.Boolean & Attribute.DefaultTo<false>;
+    length: Attribute.Decimal;
     name: Attribute.String & Attribute.Required;
     price: Attribute.Decimal & Attribute.Required;
     product: Attribute.Relation<
@@ -1077,6 +1119,8 @@ export interface ApiProductPartProductPart extends Schema.CollectionType {
       'admin::user'
     > &
       Attribute.Private;
+    weight_oz: Attribute.Decimal & Attribute.Required & Attribute.DefaultTo<1>;
+    width: Attribute.Decimal;
   };
 }
 
@@ -1115,17 +1159,17 @@ export interface ApiProductProduct extends Schema.CollectionType {
       Attribute.Private;
     customizable: Attribute.Boolean;
     default_price: Attribute.Decimal;
+    default_shipping_box: Attribute.Relation<
+      'api::product.product',
+      'oneToOne',
+      'api::shipping-box.shipping-box'
+    >;
     description: Attribute.Text;
     device: Attribute.Relation<
       'api::product.product',
       'manyToOne',
       'api::device.device'
-    > &
-      Attribute.SetPluginOptions<{
-        'content-manager': {
-          displayField: 'model';
-        };
-      }>;
+    >;
     dimensions: Attribute.String;
     discount_codes: Attribute.Relation<
       'api::product.product',
@@ -1139,7 +1183,9 @@ export interface ApiProductProduct extends Schema.CollectionType {
       'manyToMany',
       'api::engraving-option.engraving-option'
     >;
+    height: Attribute.Decimal;
     keywords: Attribute.String;
+    length: Attribute.Decimal;
     materials: Attribute.Component<'products.materials', true>;
     meta_description: Attribute.Text;
     meta_title: Attribute.String;
@@ -1183,7 +1229,8 @@ export interface ApiProductProduct extends Schema.CollectionType {
       'oneToMany',
       'api::user-custom-case.user-custom-case'
     >;
-    weight: Attribute.Decimal;
+    weight_oz: Attribute.Decimal;
+    width: Attribute.Decimal;
     wish_lists: Attribute.Relation<
       'api::product.product',
       'manyToMany',
@@ -1310,6 +1357,47 @@ export interface ApiReviewReview extends Schema.CollectionType {
       'manyToOne',
       'plugin::users-permissions.user'
     >;
+  };
+}
+
+export interface ApiShippingBoxShippingBox extends Schema.CollectionType {
+  collectionName: 'shipping_boxes';
+  info: {
+    description: 'Available shipping box sizes for order fulfillment';
+    displayName: 'Shipping Box';
+    pluralName: 'shipping-boxes';
+    singularName: 'shipping-box';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Attribute.DateTime;
+    createdBy: Attribute.Relation<
+      'api::shipping-box.shipping-box',
+      'oneToOne',
+      'admin::user'
+    > &
+      Attribute.Private;
+    empty_weight_oz: Attribute.Decimal &
+      Attribute.Required &
+      Attribute.DefaultTo<4>;
+    height: Attribute.Decimal & Attribute.Required;
+    is_active: Attribute.Boolean & Attribute.DefaultTo<true>;
+    length: Attribute.Decimal & Attribute.Required;
+    max_weight_oz: Attribute.Decimal &
+      Attribute.Required &
+      Attribute.DefaultTo<1120>;
+    name: Attribute.String & Attribute.Required & Attribute.Unique;
+    priority: Attribute.Integer & Attribute.DefaultTo<0>;
+    updatedAt: Attribute.DateTime;
+    updatedBy: Attribute.Relation<
+      'api::shipping-box.shipping-box',
+      'oneToOne',
+      'admin::user'
+    > &
+      Attribute.Private;
+    width: Attribute.Decimal & Attribute.Required;
   };
 }
 
@@ -1940,6 +2028,7 @@ declare module '@strapi/types' {
       'api::product.product': ApiProductProduct;
       'api::promotion.promotion': ApiPromotionPromotion;
       'api::review.review': ApiReviewReview;
+      'api::shipping-box.shipping-box': ApiShippingBoxShippingBox;
       'api::shipping-option.shipping-option': ApiShippingOptionShippingOption;
       'api::site-setting.site-setting': ApiSiteSettingSiteSetting;
       'api::user-custom-case.user-custom-case': ApiUserCustomCaseUserCustomCase;

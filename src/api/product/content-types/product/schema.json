@@ -11,12 +11,24 @@
     "draftAndPublish": true
   },
   "attributes": {
-    "name": { "type": "string" },
-    "description": { "type": "text" },
-    "default_price": { "type": "decimal" },
-    "discounted_price": { "type": "decimal" },
-    "effective_price": { "type": "decimal" },
-    "on_sale": { "type": "boolean" },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "text"
+    },
+    "default_price": {
+      "type": "decimal"
+    },
+    "discounted_price": {
+      "type": "decimal"
+    },
+    "effective_price": {
+      "type": "decimal"
+    },
+    "on_sale": {
+      "type": "boolean"
+    },
     "product_parts": {
       "type": "relation",
       "relation": "oneToMany",
@@ -28,8 +40,25 @@
       "repeatable": true,
       "component": "products.materials"
     },
-    "dimensions": { "type": "string" },
-    "weight": { "type": "decimal" },
+    "dimensions": {
+      "type": "string"
+    },
+    "weight_oz": {
+      "type": "decimal",
+      "description": "Weight in ounces"
+    },
+    "length": {
+      "type": "decimal",
+      "description": "Length in inches"
+    },
+    "width": {
+      "type": "decimal",
+      "description": "Width in inches"
+    },
+    "height": {
+      "type": "decimal",
+      "description": "Height in inches"
+    },
     "thumbnail_image": {
       "type": "media",
       "multiple": false,
@@ -48,11 +77,22 @@
       "required": false,
       "allowedTypes": ["images", "files", "videos", "audios"]
     },
-    "units_sold": { "type": "integer", "default": 0 },
-    "customizable": { "type": "boolean" },
-    "meta_title": { "type": "string" },
-    "meta_description": { "type": "text" },
-    "keywords": { "type": "string" },
+    "units_sold": {
+      "type": "integer",
+      "default": 0
+    },
+    "customizable": {
+      "type": "boolean"
+    },
+    "meta_title": {
+      "type": "string"
+    },
+    "meta_description": {
+      "type": "text"
+    },
+    "keywords": {
+      "type": "string"
+    },
     "colors": {
       "type": "relation",
       "relation": "manyToMany",
@@ -74,8 +114,7 @@
       "type": "relation",
       "relation": "manyToOne",
       "target": "api::device.device",
-      "inversedBy": "products",
-      "pluginOptions": { "content-manager": { "displayField": "model" } }
+      "inversedBy": "products"
     },
     "user_custom_cases": {
       "type": "relation",
@@ -83,22 +122,32 @@
       "target": "api::user-custom-case.user-custom-case",
       "mappedBy": "product"
     },
-    "sku": { "type": "string", "unique": true },
+    "sku": {
+      "type": "string",
+      "unique": true
+    },
     "promotions": {
       "type": "relation",
       "relation": "manyToMany",
       "target": "api::promotion.promotion",
       "inversedBy": "products"
     },
-    "star_rating": { "type": "decimal" },
-    "review_count": { "type": "integer" },
+    "star_rating": {
+      "type": "decimal"
+    },
+    "review_count": {
+      "type": "integer"
+    },
     "wish_lists": {
       "type": "relation",
       "relation": "manyToMany",
       "target": "api::wish-list.wish-list",
       "mappedBy": "products"
     },
-    "slug": { "type": "string", "unique": true },
+    "slug": {
+      "type": "string",
+      "unique": true
+    },
     "discount_codes": {
       "type": "relation",
       "relation": "manyToMany",
@@ -110,6 +159,12 @@
       "relation": "manyToMany",
       "target": "api::category.category",
       "mappedBy": "products"
+    },
+    "default_shipping_box": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::shipping-box.shipping-box",
+      "description": "Default shipping box for this product"
     }
   }
 }

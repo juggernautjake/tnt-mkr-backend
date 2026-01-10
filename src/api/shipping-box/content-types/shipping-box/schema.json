@@ -1,0 +1,56 @@
+{
+  "kind": "collectionType",
+  "collectionName": "shipping_boxes",
+  "info": {
+    "singularName": "shipping-box",
+    "pluralName": "shipping-boxes",
+    "displayName": "Shipping Box",
+    "description": "Available shipping box sizes for order fulfillment"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "length": {
+      "type": "decimal",
+      "required": true,
+      "description": "Length in inches"
+    },
+    "width": {
+      "type": "decimal",
+      "required": true,
+      "description": "Width in inches"
+    },
+    "height": {
+      "type": "decimal",
+      "required": true,
+      "description": "Height in inches"
+    },
+    "empty_weight_oz": {
+      "type": "decimal",
+      "required": true,
+      "default": 4,
+      "description": "Weight of empty box with packing materials in ounces"
+    },
+    "max_weight_oz": {
+      "type": "decimal",
+      "required": true,
+      "default": 1120,
+      "description": "Maximum weight capacity in ounces (70 lbs = 1120 oz)"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "priority": {
+      "type": "integer",
+      "default": 0,
+      "description": "Lower number = preferred box when multiple fit"
+    }
+  }
+}

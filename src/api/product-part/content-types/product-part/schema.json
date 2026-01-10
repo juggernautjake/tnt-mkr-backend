@@ -4,17 +4,49 @@
   "info": {
     "singularName": "product-part",
     "pluralName": "product-parts",
-    "displayName": "Product Part"
+    "displayName": "Product Part",
+    "description": ""
   },
   "options": {
     "draftAndPublish": true
   },
   "attributes": {
-    "name": { "type": "string", "required": true },
-    "description": { "type": "text" },
-    "price": { "type": "decimal", "required": true },
-    "discounted_price": { "type": "decimal" },
-    "is_full_case": { "type": "boolean", "default": false },
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "description": {
+      "type": "text"
+    },
+    "price": {
+      "type": "decimal",
+      "required": true
+    },
+    "discounted_price": {
+      "type": "decimal"
+    },
+    "weight_oz": {
+      "type": "decimal",
+      "required": true,
+      "default": 1,
+      "description": "Weight in ounces"
+    },
+    "length": {
+      "type": "decimal",
+      "description": "Length in inches"
+    },
+    "width": {
+      "type": "decimal",
+      "description": "Width in inches"
+    },
+    "height": {
+      "type": "decimal",
+      "description": "Height in inches"
+    },
+    "is_full_case": {
+      "type": "boolean",
+      "default": false
+    },
     "colors": {
       "type": "relation",
       "relation": "manyToMany",

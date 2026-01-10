@@ -26,7 +26,10 @@
       "enum": [
         "pending",
         "paid",
+        "processing",
         "shipped",
+        "in_transit",
+        "out_for_delivery",
         "delivered",
         "canceled",
         "returned"
@@ -38,7 +41,8 @@
       "enum": [
         "pending",
         "completed",
-        "failed"
+        "failed",
+        "refunded"
       ],
       "default": "pending"
     },
@@ -53,12 +57,28 @@
       "type": "datetime",
       "required": true
     },
+    "shipped_at": {
+      "type": "datetime",
+      "description": "When the order was shipped"
+    },
+    "delivered_at": {
+      "type": "datetime",
+      "description": "When the order was delivered"
+    },
+    "estimated_delivery_date": {
+      "type": "date",
+      "description": "Estimated delivery date from carrier"
+    },
     "customer_name": {
       "type": "string",
       "required": true
     },
     "customer_phone": {
       "type": "string"
+    },
+    "customer_email": {
+      "type": "email",
+      "description": "Customer email (for logged in users or guests)"
     },
     "payment_method": {
       "type": "string"
@@ -126,6 +146,55 @@
     "confirmation_email_sent": {
       "type": "boolean",
       "default": false
+    },
+    "shipping_notification_sent": {
+      "type": "boolean",
+      "default": false
+    },
+    "easypost_rate_id": {
+      "type": "string",
+      "description": "Selected EasyPost rate ID"
+    },
+    "easypost_shipment_id": {
+      "type": "string",
+      "description": "EasyPost shipment ID"
+    },
+    "easypost_tracker_id": {
+      "type": "string",
+      "description": "EasyPost tracker ID for tracking updates"
+    },
+    "carrier_service": {
+      "type": "string",
+      "description": "Carrier and service name (e.g., USPS Priority Mail)"
+    },
+    "package_weight_oz": {
+      "type": "decimal",
+      "description": "Final package weight in ounces"
+    },
+    "package_length": {
+      "type": "decimal",
+      "description": "Package length in inches"
+    },
+    "package_width": {
+      "type": "decimal",
+      "description": "Package width in inches"
+    },
+    "package_height": {
+      "type": "decimal",
+      "description": "Package height in inches"
+    },
+    "shipping_box": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::shipping-box.shipping-box"
+    },
+    "admin_notes": {
+      "type": "text",
+      "description": "Internal notes for order fulfillment"
+    },
+    "google_sheet_row": {
+      "type": "integer",
+      "description": "Row number in Google Sheet for this order"
     }
   }
 }

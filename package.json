@@ -14,6 +14,7 @@
     "ts:generate-types": "strapi ts:generate-types"
   },
   "dependencies": {
+    "@easypost/api": "^8.4.0",
     "@strapi/plugin-cloud": "^4.25.21",
     "@strapi/plugin-users-permissions": "^4.25.21",
     "@strapi/provider-email-mailgun": "^5.10.3",
@@ -26,6 +27,7 @@
     "cloudinary": "^2.5.1",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
+    "googleapis": "^170.0.0",
     "handlebars": "^4.7.8",
     "mailgun.js": "^10.2.4",
     "node-fetch": "^2.6.7",
