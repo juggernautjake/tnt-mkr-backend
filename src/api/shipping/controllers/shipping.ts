@@ -240,7 +240,7 @@ export default {
         return ctx.send({ suggestions: [] });
       }
 
-      const results = await response.json();
+      const results: any[] = await response.json();
       
       // Transform Nominatim results to our suggestion format
       const suggestions = results
