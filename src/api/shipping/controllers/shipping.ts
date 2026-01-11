@@ -154,7 +154,7 @@ async function sendShippingNotification(strapi: any, order: any) {
     // Send email with BCC to customer service
     await strapi.plugins['email'].services.email.send({
       to: customerEmail,
-      bcc: customerServiceEmail, // BCC customer service on all shipping notifications
+      bcc: customerServiceEmail,
       from: process.env.DEFAULT_FROM_EMAIL || 'TNT MKR <no-reply@tnt-mkr.com>',
       replyTo: customerServiceEmail,
       subject: `Your TNT MKR Order Has Shipped! - ${order.order_number}`,
@@ -182,8 +182,8 @@ function mapTrackingStatusToOrderStatus(trackingStatus: string): OrderStatus {
     'return_to_sender': 'returned',
     'failure': 'returned',
     'cancelled': 'canceled',
-    'error': 'shipped', // Keep as shipped if there's an error
-    'unknown': 'shipped', // Keep as shipped if unknown
+    'error': 'shipped',
+    'unknown': 'shipped',
   };
   return statusMap[trackingStatus] || 'shipped';
 }
@@ -197,7 +197,6 @@ export default {
       return ctx.badRequest('Missing required address fields: street, city, state, postal_code');
     }
 
-    // Check if state is continental US first
     if (!easypostService.isValidContinentalUS(address.state)) {
       return ctx.send({
         is_valid: false,
@@ -234,19 +233,16 @@ export default {
       return ctx.badRequest('Cart items are required');
     }
 
-    // Validate state is continental US
     if (!easypostService.isValidContinentalUS(address.state)) {
       return ctx.badRequest('We currently only ship to the continental United States (excludes Alaska, Hawaii, and US territories).');
     }
 
     try {
-      // Get all active shipping boxes
       const boxes = await strapi.entityService.findMany('api::shipping-box.shipping-box' as any, {
         filters: { is_active: true },
         sort: { priority: 'asc' },
       });
 
-      // Fetch full product/part data for each cart item
       const enrichedCartItems = await Promise.all(
         cart_items.map(async (item: any) => {
           let product = null;
@@ -280,7 +276,6 @@ export default {
         })
       );
 
-      // Get shipping rates
       const redis = strapi.redis;
       const result = await shippingCalculator.getShippingRates(
         {
@@ -394,7 +389,6 @@ export default {
 
       const updateData: any = {};
 
-      // Shipping-related fields
       if (updateFields.tracking_number !== undefined) updateData.tracking_number = updateFields.tracking_number;
       if (updateFields.carrier_service !== undefined) updateData.carrier_service = updateFields.carrier_service;
       if (updateFields.package_weight_oz !== undefined) updateData.package_weight_oz = updateFields.package_weight_oz;
@@ -402,13 +396,10 @@ export default {
       if (updateFields.package_width !== undefined) updateData.package_width = updateFields.package_width;
       if (updateFields.package_height !== undefined) updateData.package_height = updateFields.package_height;
       if (updateFields.shipping_box_id !== undefined) updateData.shipping_box = updateFields.shipping_box_id;
-      
-      // Admin management fields
       if (updateFields.admin_notes !== undefined) updateData.admin_notes = updateFields.admin_notes;
       if (updateFields.admin_hidden !== undefined) updateData.admin_hidden = updateFields.admin_hidden;
       if (updateFields.packing_status !== undefined) updateData.packing_status = updateFields.packing_status;
 
-      // Check if there's anything to update
       if (Object.keys(updateData).length === 0) {
         return ctx.badRequest('No valid fields to update');
       }
@@ -429,7 +420,6 @@ export default {
         },
       });
 
-      // Update Google Sheet (skip for admin_hidden updates to avoid unnecessary calls)
       if (!updateFields.admin_hidden) {
         try {
           await googleSheets.upsertOrder(updatedOrder as any);
@@ -442,6 +432,90 @@ export default {
     } catch (error: any) {
       strapi.log.error('Update order shipping error:', error);
       return ctx.internalServerError('Failed to update order', { error: error.message });
+    }
+  },
+
+  // Admin: Manually update order status (shipped, delivered, etc.)
+  async updateOrderStatus(ctx: Context) {
+    if (!await isAdmin(ctx)) {
+      return ctx.forbidden('Admin access required');
+    }
+
+    const { id } = ctx.params;
+    const { order_status } = ctx.request.body as { order_status: string };
+
+    const validStatuses: OrderStatus[] = ['pending', 'paid', 'processing', 'shipped', 'in_transit', 'out_for_delivery', 'delivered', 'canceled', 'returned'];
+    if (!order_status || !validStatuses.includes(order_status as OrderStatus)) {
+      return ctx.badRequest(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+    }
+
+    try {
+      const order = await strapi.entityService.findOne('api::order.order', id, {
+        populate: {
+          shipping_address: true,
+          billing_address: true,
+          order_items: {
+            populate: {
+              product: true,
+              order_item_parts: { populate: ['product_part', 'color'] },
+            },
+          },
+          user: true,
+        },
+      }) as any;
+
+      if (!order) {
+        return ctx.notFound('Order not found');
+      }
+
+      const previousStatus = order.order_status;
+      const updateData: any = {
+        order_status: order_status,
+      };
+
+      // If marking as shipped and not already shipped, set shipped_at
+      if (order_status === 'shipped' && !order.shipped_at) {
+        updateData.shipped_at = new Date().toISOString();
+      }
+
+      // If marking as delivered, set delivered_at
+      if (order_status === 'delivered' && !order.delivered_at) {
+        updateData.delivered_at = new Date().toISOString();
+      }
+
+      const updatedOrder = await strapi.entityService.update('api::order.order', id, {
+        data: updateData,
+        populate: {
+          shipping_address: true,
+          billing_address: true,
+          order_items: {
+            populate: {
+              product: true,
+              order_item_parts: { populate: ['product_part', 'color'] },
+            },
+          },
+          user: true,
+        },
+      });
+
+      // Update Google Sheet
+      try {
+        await googleSheets.upsertOrder(updatedOrder as any);
+      } catch (sheetError) {
+        strapi.log.error('Failed to update Google Sheet:', sheetError);
+      }
+
+      strapi.log.info(`[MANUAL STATUS UPDATE] Order ${order.order_number}: Changed status from "${previousStatus}" to "${order_status}"`);
+
+      return ctx.send({
+        order: updatedOrder,
+        previous_status: previousStatus,
+        new_status: order_status,
+        message: `Order status updated from "${previousStatus}" to "${order_status}"`,
+      });
+    } catch (error: any) {
+      strapi.log.error('Update order status error:', error);
+      return ctx.internalServerError('Failed to update order status', { error: error.message });
     }
   },
 
@@ -477,7 +551,6 @@ export default {
         return ctx.notFound('Order not found');
       }
 
-      // Create EasyPost tracker and get current status
       let easypostTrackerId = '';
       let currentTrackingStatus: OrderStatus = 'shipped';
       let estimatedDeliveryDate = null;
@@ -487,18 +560,15 @@ export default {
         const trackerResult = await easypostService.createTracker(tracking_number, carrier_service);
         easypostTrackerId = trackerResult.id || '';
         
-        // Map the tracking status to order status
         if (trackerResult.status) {
           currentTrackingStatus = mapTrackingStatusToOrderStatus(trackerResult.status);
           strapi.log.info(`[TRACKING] Order ${(order as any).order_number}: EasyPost status is "${trackerResult.status}", mapped to "${currentTrackingStatus}"`);
         }
         
-        // Get estimated delivery date if available
         if (trackerResult.est_delivery_date) {
           estimatedDeliveryDate = trackerResult.est_delivery_date;
         }
         
-        // If already delivered, capture the delivery date
         if (trackerResult.status === 'delivered' && trackerResult.delivered_at) {
           deliveredAt = trackerResult.delivered_at;
         }
@@ -506,7 +576,6 @@ export default {
         strapi.log.error('Failed to create EasyPost tracker:', trackerError);
       }
 
-      // Update order with tracking info and correct status
       const updateData: any = {
         tracking_number,
         carrier_service,
@@ -538,7 +607,6 @@ export default {
         },
       });
 
-      // Send shipping notification email (with BCC to customer service)
       let emailResult: { success: boolean; reason?: string; sentTo?: string; bcc?: string; error?: string } = { success: false, reason: 'not_attempted' };
       const customerEmail = (order as any).customer_email || (order as any).guest_email || (order as any).user?.email;
       if (customerEmail && !(order as any).shipping_notification_sent) {
@@ -552,7 +620,6 @@ export default {
         emailResult = { success: true, reason: 'already_sent' } as any;
       }
 
-      // Update Google Sheet
       try {
         await googleSheets.upsertOrder(updatedOrder as any);
       } catch (sheetError) {
@@ -602,7 +669,6 @@ export default {
         return ctx.badRequest('Order has no tracking number');
       }
 
-      // Get latest tracking status from EasyPost
       const trackingResult = await easypostService.getTrackingStatus(
         order.tracking_number,
         order.carrier_service || 'USPS'
@@ -645,7 +711,6 @@ export default {
         },
       });
 
-      // Update Google Sheet
       try {
         await googleSheets.upsertOrder(updatedOrder as any);
       } catch (sheetError) {
@@ -673,7 +738,6 @@ export default {
     }
 
     try {
-      // Find all orders with tracking numbers that are not delivered or returned
       const orders = await strapi.entityService.findMany('api::order.order', {
         filters: {
           tracking_number: { $notNull: true, $ne: '' },
@@ -711,9 +775,26 @@ export default {
                 updateData.delivered_at = trackingResult.delivered_at;
               }
 
-              await strapi.entityService.update('api::order.order', order.id, {
+              const updatedOrder = await strapi.entityService.update('api::order.order', order.id, {
                 data: updateData,
+                populate: {
+                  shipping_address: true,
+                  billing_address: true,
+                  order_items: {
+                    populate: {
+                      product: true,
+                      order_item_parts: { populate: ['product_part', 'color'] },
+                    },
+                  },
+                  user: true,
+                },
               });
+
+              try {
+                await googleSheets.upsertOrder(updatedOrder as any);
+              } catch (sheetError) {
+                strapi.log.error(`Failed to update Google Sheet for order ${order.order_number}:`, sheetError);
+              }
 
               results.push({
                 order_number: order.order_number,
@@ -737,7 +818,6 @@ export default {
             });
           }
 
-          // Add a small delay to avoid rate limiting
           await new Promise(resolve => setTimeout(resolve, 200));
         } catch (err: any) {
           results.push({
@@ -775,7 +855,6 @@ export default {
 
     let trackingData: Array<{ order_number?: string; order_id?: number; tracking_number: string }> = [];
 
-    // Parse CSV data if provided
     if (csv_data) {
       const lines = csv_data.trim().split('\n');
       for (const line of lines) {
@@ -806,7 +885,6 @@ export default {
       try {
         let orderId: number | null = null;
 
-        // Find order by ID or order number
         if (data.order_id) {
           orderId = data.order_id;
         } else if (data.order_number) {
@@ -829,27 +907,53 @@ export default {
           continue;
         }
 
-        // Create tracker and get status
         let trackerId = '';
         let orderStatus: OrderStatus = 'shipped';
+        let estimatedDeliveryDate = null;
         try {
           const trackerResult = await easypostService.createTracker(data.tracking_number, 'USPS');
           trackerId = trackerResult.id || '';
           if (trackerResult.status) {
             orderStatus = mapTrackingStatusToOrderStatus(trackerResult.status);
           }
+          if (trackerResult.est_delivery_date) {
+            estimatedDeliveryDate = trackerResult.est_delivery_date;
+          }
         } catch (e) {
           // Continue without tracker
         }
 
-        await strapi.entityService.update('api::order.order', orderId, {
-          data: {
-            tracking_number: data.tracking_number,
-            order_status: orderStatus,
-            shipped_at: new Date().toISOString(),
-            easypost_tracker_id: trackerId,
+        const updateData: any = {
+          tracking_number: data.tracking_number,
+          order_status: orderStatus,
+          shipped_at: new Date().toISOString(),
+          easypost_tracker_id: trackerId,
+        };
+
+        if (estimatedDeliveryDate) {
+          updateData.estimated_delivery_date = estimatedDeliveryDate;
+        }
+
+        const updatedOrder = await strapi.entityService.update('api::order.order', orderId, {
+          data: updateData,
+          populate: {
+            shipping_address: true,
+            billing_address: true,
+            order_items: {
+              populate: {
+                product: true,
+                order_item_parts: { populate: ['product_part', 'color'] },
+              },
+            },
+            user: true,
           },
         });
+
+        try {
+          await googleSheets.upsertOrder(updatedOrder as any);
+        } catch (sheetError) {
+          strapi.log.error(`Failed to update Google Sheet for bulk tracking:`, sheetError);
+        }
 
         results.push({ 
           identifier: data.order_number || String(data.order_id), 
@@ -886,7 +990,6 @@ export default {
       let orders: any[] = [];
 
       if (order_ids && Array.isArray(order_ids) && order_ids.length > 0) {
-        // Export specific orders
         for (const orderId of order_ids) {
           const order = await strapi.entityService.findOne('api::order.order', orderId, {
             populate: {
@@ -899,7 +1002,6 @@ export default {
           }
         }
       } else {
-        // Export all unshipped orders that are packed and ready
         orders = await strapi.entityService.findMany('api::order.order', {
           filters: {
             packing_status: 'packed',
@@ -919,17 +1021,14 @@ export default {
         return ctx.badRequest('No orders to export. Make sure orders are marked as "Packed & Ready" and have no tracking number.');
       }
 
-      // Update Google Sheet with export
       try {
         await googleSheets.addToPirateShipExport(orders as any);
       } catch (sheetError) {
         strapi.log.error('Failed to update Google Sheet for Pirate Ship export:', sheetError);
       }
 
-      // Generate CSV
       const csv = await googleSheets.getPirateShipCSV(orders as any);
 
-      // Set headers for file download
       ctx.set('Content-Type', 'text/csv');
       ctx.set('Content-Disposition', `attachment; filename="pirate-ship-export-${new Date().toISOString().split('T')[0]}.csv"`);
       
@@ -947,7 +1046,6 @@ export default {
     }
 
     try {
-      // Initialize Google Sheets if needed
       const initialized = await googleSheets.initGoogleSheets();
       if (!initialized) {
         return ctx.badRequest('Google Sheets is not configured. Please check your environment variables.');
@@ -955,7 +1053,6 @@ export default {
 
       await googleSheets.ensureOrdersSheet();
 
-      // Get all orders from the last 90 days
       const ninetyDaysAgo = new Date();
       ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
@@ -987,7 +1084,6 @@ export default {
         try {
           const rowNumber = await googleSheets.upsertOrder(order);
           if (rowNumber) {
-            // Update order with row number if not already set
             if (!order.google_sheet_row || order.google_sheet_row !== rowNumber) {
               await strapi.entityService.update('api::order.order', order.id, {
                 data: { google_sheet_row: rowNumber },

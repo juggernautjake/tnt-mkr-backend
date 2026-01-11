@@ -49,6 +49,15 @@ export default {
         policies: [],
       },
     },
+    // Manual status update (shipped, delivered, etc.)
+    {
+      method: 'PUT',
+      path: '/shipping/admin/orders/:id/status',
+      handler: 'shipping.updateOrderStatus',
+      config: {
+        policies: [],
+      },
+    },
     {
       method: 'POST',
       path: '/shipping/admin/orders/:id/ship',

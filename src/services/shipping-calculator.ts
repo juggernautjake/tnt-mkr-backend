@@ -15,57 +15,54 @@ const ZONES: Record<string, string[]> = {
 };
 
 // Box size categories for handling fees
-// Small: boxes with volume <= 48 cubic inches (priority 1-6)
-// Medium: boxes with volume <= 384 cubic inches (priority 7-19)
-// Large: boxes with volume > 384 cubic inches (priority 20-30)
 const BOX_SIZE_THRESHOLDS = {
-  small: { maxPriority: 6, handlingFeeCents: 100 },      // $1.00
-  medium: { maxPriority: 19, handlingFeeCents: 225 },    // $2.25
-  large: { maxPriority: 30, handlingFeeCents: 400 },     // $4.00
+  small: { maxPriority: 6, handlingFeeCents: 100 },
+  medium: { maxPriority: 19, handlingFeeCents: 225 },
+  large: { maxPriority: 30, handlingFeeCents: 400 },
 };
 
 // Improved fallback rates closer to actual USPS rates
 const FALLBACK_RATES: Record<string, { base: Record<string, number>; per_oz: Record<string, number> }> = {
   ground_advantage: {
     base: {
-      local: 485,      // $4.85
-      regional: 545,   // $5.45
-      mid: 625,        // $6.25
-      far: 725,        // $7.25
+      local: 485,
+      regional: 545,
+      mid: 625,
+      far: 725,
     },
     per_oz: {
-      local: 4,        // $0.04 per oz
-      regional: 5,     // $0.05 per oz
-      mid: 6,          // $0.06 per oz
-      far: 7,          // $0.07 per oz
+      local: 4,
+      regional: 5,
+      mid: 6,
+      far: 7,
     },
   },
   priority: {
     base: {
-      local: 825,      // $8.25
-      regional: 985,   // $9.85
-      mid: 1145,       // $11.45
-      far: 1350,       // $13.50
+      local: 825,
+      regional: 985,
+      mid: 1145,
+      far: 1350,
     },
     per_oz: {
-      local: 7,        // $0.07 per oz
-      regional: 9,     // $0.09 per oz
-      mid: 11,         // $0.11 per oz
-      far: 13,         // $0.13 per oz
+      local: 7,
+      regional: 9,
+      mid: 11,
+      far: 13,
     },
   },
   express: {
     base: {
-      local: 2650,     // $26.50
-      regional: 3150,  // $31.50
-      mid: 3650,       // $36.50
-      far: 4250,       // $42.50
+      local: 2650,
+      regional: 3150,
+      mid: 3650,
+      far: 4250,
     },
     per_oz: {
-      local: 12,       // $0.12 per oz
-      regional: 15,    // $0.15 per oz
-      mid: 18,         // $0.18 per oz
-      far: 20,         // $0.20 per oz
+      local: 12,
+      regional: 15,
+      mid: 18,
+      far: 20,
     },
   },
 };
@@ -137,12 +134,11 @@ function getZone(state: string): string {
       return zone;
     }
   }
-  return 'far'; // Default to far for unknown states
+  return 'far';
 }
 
 // Calculate item dimensions and weight
 function getItemDimensions(item: CartItem): { length: number; width: number; height: number; weight_oz: number } {
-  // If it's an additional part purchase, only count the part dimensions
   if (item.is_additional_part && item.cart_item_parts && item.cart_item_parts.length > 0) {
     const part = item.cart_item_parts[0]?.product_part;
     if (part) {
@@ -155,15 +151,13 @@ function getItemDimensions(item: CartItem): { length: number; width: number; hei
     }
   }
 
-  // Full product with all parts
   const product = item.product;
   if (!product) {
-    return { length: 4, width: 3, height: 0.5, weight_oz: 2 }; // Default phone case size
+    return { length: 4, width: 3, height: 0.5, weight_oz: 2 };
   }
 
   let totalWeight = product.weight_oz || 2;
 
-  // Add weight from all parts
   if (item.cart_item_parts) {
     for (const cip of item.cart_item_parts) {
       if (cip.product_part?.weight_oz) {
@@ -185,7 +179,6 @@ async function calculatePackages(cartItems: CartItem[], boxes: ShippingBox[]): P
   const packages: PackageInfo[] = [];
   const sortedBoxes = [...boxes].sort((a, b) => a.priority - b.priority);
 
-  // Flatten cart items by quantity
   const items: Array<{ length: number; width: number; height: number; weight_oz: number }> = [];
   for (const item of cartItems) {
     const dims = getItemDimensions(item);
@@ -198,22 +191,18 @@ async function calculatePackages(cartItems: CartItem[], boxes: ShippingBox[]): P
     return packages;
   }
 
-  // Simple bin packing: try to fit all items in smallest possible box
   let remainingItems = [...items];
 
   while (remainingItems.length > 0) {
     let bestBox: ShippingBox | null = null;
     let itemsFitInBox: typeof items = [];
 
-    // Try each box size, starting from smallest
     for (const box of sortedBoxes) {
       const fits: typeof items = [];
       let totalWeight = box.empty_weight_oz;
       let totalHeight = 0;
 
-      // Try to fit items (simple stacking approach)
       for (const item of remainingItems) {
-        // Check if item fits in box footprint
         const fitsWidth = item.length <= box.length && item.width <= box.width;
         const fitsRotated = item.width <= box.length && item.length <= box.width;
 
@@ -230,7 +219,6 @@ async function calculatePackages(cartItems: CartItem[], boxes: ShippingBox[]): P
         bestBox = box;
         itemsFitInBox = fits;
 
-        // If all remaining items fit, we're done with this box
         if (fits.length === remainingItems.length) {
           break;
         }
@@ -238,12 +226,10 @@ async function calculatePackages(cartItems: CartItem[], boxes: ShippingBox[]): P
     }
 
     if (!bestBox || itemsFitInBox.length === 0) {
-      // Fallback to largest box if nothing fits
       bestBox = sortedBoxes[sortedBoxes.length - 1];
       itemsFitInBox = remainingItems.slice(0, 1);
     }
 
-    // Calculate total weight for this package
     const packageWeight = bestBox.empty_weight_oz +
       itemsFitInBox.reduce((sum, item) => sum + item.weight_oz, 0);
 
@@ -257,7 +243,6 @@ async function calculatePackages(cartItems: CartItem[], boxes: ShippingBox[]): P
       items_count: itemsFitInBox.length,
     });
 
-    // Remove packed items from remaining
     remainingItems = remainingItems.slice(itemsFitInBox.length);
   }
 
@@ -269,12 +254,8 @@ function calculateFallbackRates(packages: PackageInfo[], destinationState: strin
   const zone = getZone(destinationState);
   const rates: ShippingRate[] = [];
 
-  // Calculate total weight and get highest priority box (for handling fee)
-  const totalWeight = packages.reduce((sum, pkg) => sum + pkg.weight_oz, 0);
-  const highestPriority = Math.max(...packages.map(pkg => pkg.box_priority));
   const totalHandlingFee = packages.reduce((sum, pkg) => sum + getHandlingFeeCents(pkg.box_priority), 0);
 
-  // Generate rates for each service
   const services = [
     { key: 'ground_advantage', name: 'USPS Ground Advantage', days: zone === 'local' ? 3 : zone === 'regional' ? 4 : zone === 'mid' ? 5 : 6 },
     { key: 'priority', name: 'USPS Priority Mail', days: zone === 'local' ? 2 : zone === 'regional' ? 2 : zone === 'mid' ? 3 : 3 },
@@ -286,13 +267,11 @@ function calculateFallbackRates(packages: PackageInfo[], destinationState: strin
     const baseRate = rateConfig.base[zone];
     const perOzRate = rateConfig.per_oz[zone];
 
-    // Calculate rate: base + (weight * per_oz_rate) for each package
     let totalRateCents = 0;
     for (const pkg of packages) {
       totalRateCents += baseRate + (pkg.weight_oz * perOzRate);
     }
 
-    // Calculate delivery date (add 5 days for manufacturing)
     const deliveryDate = new Date();
     deliveryDate.setDate(deliveryDate.getDate() + 5 + service.days);
 
@@ -302,13 +281,12 @@ function calculateFallbackRates(packages: PackageInfo[], destinationState: strin
       service: service.name,
       rate_cents: totalRateCents,
       rate_with_handling_cents: totalRateCents + totalHandlingFee,
-      estimated_delivery_days: service.days + 5, // Include manufacturing time
+      estimated_delivery_days: service.days + 5,
       estimated_delivery_date: deliveryDate.toISOString().split('T')[0],
       delivery_guarantee: service.key === 'express',
     });
   }
 
-  // Sort by price
   rates.sort((a, b) => a.rate_with_handling_cents - b.rate_with_handling_cents);
 
   return rates;
@@ -321,7 +299,6 @@ async function getShippingRates(
   boxes: ShippingBox[],
   redis?: any
 ): Promise<RateResult> {
-  // Calculate packages needed
   const packages = await calculatePackages(cartItems, boxes);
 
   if (packages.length === 0) {
@@ -333,7 +310,6 @@ async function getShippingRates(
     };
   }
 
-  // Check cache first
   const cacheKey = `shipping_rates:${address.postal_code}:${address.state}:${JSON.stringify(packages.map(p => ({ w: p.weight_oz, l: p.length, h: p.height, d: p.width })))}`;
 
   if (redis) {
@@ -353,7 +329,6 @@ async function getShippingRates(
     const easypostRates = await easypostService.getRates(address, packages);
 
     if (easypostRates.rates && easypostRates.rates.length > 0) {
-      // Add handling fees based on box sizes
       const totalHandlingFee = packages.reduce((sum, pkg) => sum + getHandlingFeeCents(pkg.box_priority), 0);
 
       const ratesWithHandling: ShippingRate[] = easypostRates.rates.map((rate: any) => ({
@@ -367,18 +342,16 @@ async function getShippingRates(
         delivery_guarantee: rate.delivery_date_guaranteed || false,
       }));
 
-      // Sort by price
       ratesWithHandling.sort((a, b) => a.rate_with_handling_cents - b.rate_with_handling_cents);
 
       const result: RateResult = {
         rates: ratesWithHandling,
         packages,
-        shipment_id: easypostRates.shipment_ids?.[0], // Use first shipment ID
+        shipment_id: easypostRates.shipment_ids?.[0], // Use first shipment ID from array
         cached: false,
         fallback_used: false,
       };
 
-      // Cache for 20 minutes
       if (redis) {
         try {
           await redis.setex(cacheKey, 1200, JSON.stringify(result));
@@ -403,7 +376,6 @@ async function getShippingRates(
     fallback_used: true,
   };
 
-  // Cache fallback for 10 minutes
   if (redis) {
     try {
       await redis.setex(cacheKey, 600, JSON.stringify(result));
