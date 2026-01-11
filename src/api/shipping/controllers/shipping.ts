@@ -2,6 +2,7 @@ import { Context } from 'koa';
 import easypostService from '../../../services/easypost';
 import shippingCalculator from '../../../services/shipping-calculator';
 import googleSheets from '../../../services/google-sheets';
+import orderEmailTemplates from '../../../services/order-email-templates';
 
 // Helper function to check if user is admin
 async function isAdmin(ctx: Context): Promise<boolean> {
@@ -436,17 +437,23 @@ export default {
     }
   },
 
-  // Admin: Update unified order status with optional tracking number
+  // Admin: Update unified order status with optional tracking number and email notification
   async updateOrderStatus(ctx: Context) {
     if (!await isAdmin(ctx)) {
       return ctx.forbidden('Admin access required');
     }
 
     const { id } = ctx.params;
-    const { order_status, tracking_number, carrier_service } = ctx.request.body as { 
+    const { 
+      order_status, 
+      tracking_number, 
+      carrier_service,
+      send_email = false  // NEW: Optional email notification flag
+    } = ctx.request.body as { 
       order_status: string;
       tracking_number?: string;
       carrier_service?: string;
+      send_email?: boolean;
     };
 
     const validStatuses: OrderStatus[] = ['pending', 'paid', 'printing', 'printed', 'assembling', 'packaged', 'shipped', 'in_transit', 'out_for_delivery', 'delivered', 'canceled', 'returned'];
@@ -538,9 +545,27 @@ export default {
         },
       });
 
-      // Send shipping notification if tracking was added and not already sent
-      let emailResult: { success: boolean; reason?: string; sentTo?: string; bcc?: string; error?: string } = { success: false, reason: 'not_attempted' };
-      if (tracking_number && tracking_number.trim() && !order.shipping_notification_sent) {
+      // Handle email notification
+      let emailResult: { success: boolean; reason?: string; sentTo?: string; bcc?: string; error?: string } = { success: false, reason: 'not_requested' };
+      
+      if (send_email) {
+        // Use the new email templates service for status-specific emails
+        const finalStatus = updateData.order_status || order_status;
+        emailResult = await orderEmailTemplates.sendStatusNotificationEmail(
+          strapi,
+          updatedOrder as any,
+          finalStatus
+        );
+        
+        // Mark shipping notification as sent if this is a shipped status with tracking
+        if (emailResult.success && finalStatus === 'shipped' && tracking_number) {
+          await strapi.entityService.update('api::order.order', id, {
+            data: { shipping_notification_sent: true },
+          });
+        }
+      } else if (tracking_number && tracking_number.trim() && !order.shipping_notification_sent) {
+        // Legacy behavior: auto-send shipping notification when tracking is added (for backward compatibility)
+        // This only triggers if send_email is not explicitly set
         const customerEmail = order.customer_email || order.guest_email || order.user?.email;
         if (customerEmail) {
           emailResult = await sendShippingNotification(strapi, updatedOrder);
@@ -559,7 +584,7 @@ export default {
         strapi.log.error('Failed to update Google Sheet:', sheetError);
       }
 
-      strapi.log.info(`[STATUS UPDATE] Order ${order.order_number}: Changed status from "${previousStatus}" to "${updateData.order_status}"${tracking_number ? ` with tracking ${tracking_number}` : ''}`);
+      strapi.log.info(`[STATUS UPDATE] Order ${order.order_number}: Changed status from "${previousStatus}" to "${updateData.order_status}"${tracking_number ? ` with tracking ${tracking_number}` : ''}${send_email ? ' (email requested)' : ''}`);
 
       return ctx.send({
         order: updatedOrder,
@@ -1171,7 +1196,7 @@ export default {
     }
   },
 
-  // EasyPost tracking webhook handler
+  // EasyPost tracking webhook handler - sends automatic emails for carrier status updates
   async trackingWebhook(ctx: Context) {
     const { result } = ctx.request.body as any;
 
@@ -1181,6 +1206,7 @@ export default {
 
     const trackingNumber = result.tracking_code;
     const status = result.status;
+    const estDeliveryDate = result.est_delivery_date;
 
     strapi.log.info(`[TRACKING WEBHOOK] Received for ${trackingNumber}: ${status}`);
 
@@ -1206,19 +1232,31 @@ export default {
       }
 
       const order = orders[0] as any;
+      const previousStatus = order.order_status;
+      const newOrderStatus = mapTrackingStatusToOrderStatus(status);
 
-      const orderStatus = mapTrackingStatusToOrderStatus(status);
-      let deliveredAt = order.delivered_at;
+      // Only process if status actually changed
+      if (previousStatus === newOrderStatus) {
+        strapi.log.info(`[TRACKING WEBHOOK] No status change for ${order.order_number} (still ${previousStatus})`);
+        return ctx.send({ received: true, status_unchanged: true });
+      }
 
+      const updateData: any = {
+        order_status: newOrderStatus,
+      };
+
+      // Update estimated delivery date if provided
+      if (estDeliveryDate) {
+        updateData.estimated_delivery_date = estDeliveryDate;
+      }
+
+      // Set delivered_at timestamp for delivered status
       if (status === 'delivered') {
-        deliveredAt = new Date().toISOString();
+        updateData.delivered_at = result.carrier_detail?.delivered_at || new Date().toISOString();
       }
 
       const updatedOrder = await strapi.entityService.update('api::order.order', order.id, {
-        data: {
-          order_status: orderStatus,
-          delivered_at: deliveredAt,
-        },
+        data: updateData,
         populate: {
           shipping_address: true,
           billing_address: true,
@@ -1232,15 +1270,41 @@ export default {
         },
       });
 
-      strapi.log.info(`[TRACKING WEBHOOK] Updated order ${order.order_number} status to: ${orderStatus}`);
+      strapi.log.info(`[TRACKING WEBHOOK] Updated order ${order.order_number}: ${previousStatus} → ${newOrderStatus}`);
 
+      // Send automatic email for carrier-triggered status updates
+      // Only for shipping statuses: in_transit, out_for_delivery, delivered
+      const autoEmailStatuses = ['in_transit', 'out_for_delivery', 'delivered'];
+      let emailResult: { success: boolean; reason?: string; sentTo?: string; error?: string } = { success: false, reason: 'not_auto_email_status' };
+
+      if (autoEmailStatuses.includes(newOrderStatus)) {
+        emailResult = await orderEmailTemplates.sendStatusNotificationEmail(
+          strapi,
+          updatedOrder as any,
+          newOrderStatus
+        );
+
+        if (emailResult.success) {
+          strapi.log.info(`[TRACKING WEBHOOK] Auto-sent "${newOrderStatus}" email for order ${order.order_number}`);
+        } else {
+          strapi.log.warn(`[TRACKING WEBHOOK] Failed to send "${newOrderStatus}" email for order ${order.order_number}: ${emailResult.reason || emailResult.error}`);
+        }
+      }
+
+      // Update Google Sheet
       try {
         await googleSheets.upsertOrder(updatedOrder as any);
       } catch (sheetError) {
         strapi.log.error('Failed to update Google Sheet from tracking webhook:', sheetError);
       }
 
-      return ctx.send({ received: true, order_updated: true });
+      return ctx.send({ 
+        received: true, 
+        order_updated: true,
+        previous_status: previousStatus,
+        new_status: newOrderStatus,
+        email_sent: emailResult.success,
+      });
     } catch (error: any) {
       strapi.log.error('Tracking webhook processing error:', error);
       return ctx.send({ received: true, error: error.message });
