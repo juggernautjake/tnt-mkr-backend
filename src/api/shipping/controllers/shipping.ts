@@ -169,9 +169,12 @@ async function sendShippingNotification(strapi: any, order: any) {
   }
 }
 
+// Valid order status values
+type OrderStatus = 'pending' | 'paid' | 'processing' | 'shipped' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'canceled' | 'returned';
+
 // Helper function to map EasyPost status to order status
-function mapTrackingStatusToOrderStatus(trackingStatus: string): string {
-  const statusMap: Record<string, string> = {
+function mapTrackingStatusToOrderStatus(trackingStatus: string): OrderStatus {
+  const statusMap: Record<string, OrderStatus> = {
     'pre_transit': 'shipped',
     'in_transit': 'in_transit',
     'out_for_delivery': 'out_for_delivery',
@@ -476,7 +479,7 @@ export default {
 
       // Create EasyPost tracker and get current status
       let easypostTrackerId = '';
-      let currentTrackingStatus = 'shipped';
+      let currentTrackingStatus: OrderStatus = 'shipped';
       let estimatedDeliveryDate = null;
       let deliveredAt = null;
 
@@ -536,7 +539,7 @@ export default {
       });
 
       // Send shipping notification email (with BCC to customer service)
-      let emailResult = { success: false, reason: 'not_attempted' };
+      let emailResult: { success: boolean; reason?: string; sentTo?: string; bcc?: string; error?: string } = { success: false, reason: 'not_attempted' };
       const customerEmail = (order as any).customer_email || (order as any).guest_email || (order as any).user?.email;
       if (customerEmail && !(order as any).shipping_notification_sent) {
         emailResult = await sendShippingNotification(strapi, updatedOrder);
@@ -828,7 +831,7 @@ export default {
 
         // Create tracker and get status
         let trackerId = '';
-        let orderStatus = 'shipped';
+        let orderStatus: OrderStatus = 'shipped';
         try {
           const trackerResult = await easypostService.createTracker(data.tracking_number, 'USPS');
           trackerId = trackerResult.id || '';
@@ -1157,6 +1160,66 @@ export default {
     } catch (error: any) {
       strapi.log.error('Calculate order package error:', error);
       return ctx.internalServerError('Failed to calculate package', { error: error.message });
+    }
+  },
+
+  // Test email configuration
+  async testEmail(ctx: Context) {
+    if (!await isAdmin(ctx)) {
+      return ctx.forbidden('Admin access required');
+    }
+
+    try {
+      const { email } = ctx.request.body as { email?: string };
+      const testEmail = email || ctx.state.user?.email;
+      
+      if (!testEmail) {
+        return ctx.badRequest('No email provided');
+      }
+
+      const customerServiceEmail = process.env.DEFAULT_REPLY_TO_EMAIL || 'customer-service@tnt-mkr.com';
+
+      await strapi.plugins['email'].services.email.send({
+        to: testEmail,
+        from: process.env.DEFAULT_FROM_EMAIL || 'TNT MKR <no-reply@tnt-mkr.com>',
+        replyTo: customerServiceEmail,
+        bcc: customerServiceEmail,
+        subject: 'TNT MKR - Email Configuration Test',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h1 style="color: #333; text-align: center;">✅ Email Test Successful</h1>
+            <p style="color: #666; text-align: center;">
+              This is a test email from your TNT MKR shipping admin panel.
+            </p>
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <p><strong>Configuration:</strong></p>
+              <ul>
+                <li>From: ${process.env.DEFAULT_FROM_EMAIL || 'no-reply@tnt-mkr.com'}</li>
+                <li>Reply-To: ${customerServiceEmail}</li>
+                <li>BCC: ${customerServiceEmail}</li>
+                <li>Mailgun Domain: ${process.env.MAILGUN_DOMAIN || 'not set'}</li>
+              </ul>
+            </div>
+            <p style="color: #999; font-size: 12px; text-align: center;">
+              Sent at ${new Date().toISOString()}
+            </p>
+          </div>
+        `,
+      });
+
+      strapi.log.info(`✅ Test email sent successfully to ${testEmail}`);
+
+      return ctx.send({
+        success: true,
+        message: `Test email sent to ${testEmail}`,
+        bcc: customerServiceEmail,
+      });
+    } catch (error: any) {
+      strapi.log.error('❌ Test email error:', error);
+      return ctx.internalServerError('Failed to send test email', { 
+        error: error.message,
+        details: error.response?.body || error.stack 
+      });
     }
   },
 };

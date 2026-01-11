@@ -311,6 +311,50 @@ const easypostService = {
       company: 'TNT MKR',
     };
   },
+
+  /**
+   * Get shipping rates for packages to an address
+   * This is a convenience wrapper around createShipment
+   */
+  async getRates(
+    toAddress: AddressInput,
+    packages: Array<{ weight_oz: number; length: number; width: number; height: number }>
+  ) {
+    const fromAddress = this.getOriginAddress();
+    const allRates: any[] = [];
+    const shipmentIds: string[] = [];
+
+    for (const parcel of packages) {
+      try {
+        const shipment = await this.createShipment(fromAddress, toAddress, parcel);
+        if (shipment.rates && shipment.rates.length > 0) {
+          allRates.push(...shipment.rates);
+        }
+        if (shipment.id) {
+          shipmentIds.push(shipment.id);
+        }
+      } catch (error: any) {
+        console.error('Error getting rates for parcel:', error);
+      }
+    }
+
+    // Deduplicate and sort rates by price
+    const uniqueRates = allRates.reduce((acc: any[], rate: any) => {
+      const key = `${rate.carrier}-${rate.service}`;
+      const existing = acc.find((r: any) => `${r.carrier}-${r.service}` === key);
+      if (!existing || rate.rate < existing.rate) {
+        return [...acc.filter((r: any) => `${r.carrier}-${r.service}` !== key), rate];
+      }
+      return acc;
+    }, []);
+
+    uniqueRates.sort((a: any, b: any) => a.rate - b.rate);
+
+    return {
+      rates: uniqueRates,
+      shipment_ids: shipmentIds,
+    };
+  },
 };
 
 export default easypostService;
