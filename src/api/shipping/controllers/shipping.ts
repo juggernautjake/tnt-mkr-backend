@@ -357,6 +357,7 @@ export default {
 
       const updateData: any = {};
 
+      // Shipping-related fields
       if (updateFields.tracking_number !== undefined) updateData.tracking_number = updateFields.tracking_number;
       if (updateFields.carrier_service !== undefined) updateData.carrier_service = updateFields.carrier_service;
       if (updateFields.package_weight_oz !== undefined) updateData.package_weight_oz = updateFields.package_weight_oz;
@@ -364,7 +365,16 @@ export default {
       if (updateFields.package_width !== undefined) updateData.package_width = updateFields.package_width;
       if (updateFields.package_height !== undefined) updateData.package_height = updateFields.package_height;
       if (updateFields.shipping_box_id !== undefined) updateData.shipping_box = updateFields.shipping_box_id;
+      
+      // Admin management fields
       if (updateFields.admin_notes !== undefined) updateData.admin_notes = updateFields.admin_notes;
+      if (updateFields.admin_hidden !== undefined) updateData.admin_hidden = updateFields.admin_hidden;
+      if (updateFields.packing_status !== undefined) updateData.packing_status = updateFields.packing_status;
+
+      // Check if there's anything to update
+      if (Object.keys(updateData).length === 0) {
+        return ctx.badRequest('No valid fields to update');
+      }
 
       const updatedOrder = await strapi.entityService.update('api::order.order', id, {
         data: updateData,
@@ -382,11 +392,13 @@ export default {
         },
       });
 
-      // Update Google Sheet
-      try {
-        await googleSheets.upsertOrder(updatedOrder as any);
-      } catch (sheetError) {
-        strapi.log.error('Failed to update Google Sheet:', sheetError);
+      // Update Google Sheet (skip for admin_hidden updates to avoid unnecessary calls)
+      if (!updateFields.admin_hidden) {
+        try {
+          await googleSheets.upsertOrder(updatedOrder as any);
+        } catch (sheetError) {
+          strapi.log.error('Failed to update Google Sheet:', sheetError);
+        }
       }
 
       return ctx.send({ order: updatedOrder });
