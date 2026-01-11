@@ -373,7 +373,7 @@ async function getShippingRates(
       const result: RateResult = {
         rates: ratesWithHandling,
         packages,
-        shipment_id: easypostRates.shipment_id,
+        shipment_id: easypostRates.shipment_ids?.[0], // Use first shipment ID
         cached: false,
         fallback_used: false,
       };
