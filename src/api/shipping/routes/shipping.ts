@@ -13,6 +13,15 @@ export default {
     },
     {
       method: 'POST',
+      path: '/shipping/address-suggestions',
+      handler: 'shipping.getAddressSuggestions',
+      config: {
+        auth: false,
+        policies: [],
+      },
+    },
+    {
+      method: 'POST',
       path: '/shipping/rates',
       handler: 'shipping.getRates',
       config: {
@@ -49,7 +58,6 @@ export default {
         policies: [],
       },
     },
-    // NEW: Update order status with optional email notification
     {
       method: 'PUT',
       path: '/shipping/admin/orders/:id/status',
@@ -109,7 +117,7 @@ export default {
     {
       method: 'POST',
       path: '/shipping/admin/sync-google-sheets',
-      handler: 'shipping.syncToGoogleSheets',
+      handler: 'shipping.syncGoogleSheets',
       config: {
         policies: [],
       },
