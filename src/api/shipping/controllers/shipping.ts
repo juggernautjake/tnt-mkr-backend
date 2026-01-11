@@ -240,7 +240,10 @@ export default {
         return ctx.send({ suggestions: [] });
       }
 
-      const results: any[] = await response.json();
+      const data = await response.json();
+      
+      // Ensure we have an array
+      const results: any[] = Array.isArray(data) ? data : [];
       
       // Transform Nominatim results to our suggestion format
       const suggestions = results
@@ -887,11 +890,12 @@ export default {
     }
 
     try {
+      // Cast filters to any to bypass TypeScript enum restrictions for new unified statuses
       const orders = await strapi.entityService.findMany('api::order.order', {
         filters: {
           tracking_number: { $notNull: true, $ne: '' },
           order_status: { $in: ['shipped', 'in_transit', 'out_for_delivery'] },
-        },
+        } as any,
         populate: {
           shipping_address: true,
           user: true,
@@ -1144,12 +1148,13 @@ export default {
           }
         }
       } else {
+        // Cast filters to any to bypass TypeScript enum restrictions for new unified statuses
         orders = await strapi.entityService.findMany('api::order.order', {
           filters: {
             order_status: 'packaged',
             tracking_number: { $null: true },
             admin_hidden: { $ne: true },
-          },
+          } as any,
           populate: {
             shipping_address: true,
             user: true,
@@ -1180,8 +1185,8 @@ export default {
     }
   },
 
-  // Admin: Sync orders to Google Sheets
-  async syncToGoogleSheets(ctx: Context) {
+  // Admin: Sync orders to Google Sheets (RENAMED from syncToGoogleSheets to syncGoogleSheets)
+  async syncGoogleSheets(ctx: Context) {
     if (!await isAdmin(ctx)) {
       return ctx.forbidden('Admin access required');
     }
