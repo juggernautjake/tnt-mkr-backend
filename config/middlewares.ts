@@ -19,7 +19,7 @@ export default [
                   if (retries > 10) {
                     return new Error('Too many reconnection attempts');
                   }
-                  return 1000;
+                  return 1000; // Reconnect after 1 second
                 },
               },
             },
@@ -37,7 +37,8 @@ export default [
   {
     name: 'strapi::cors',
     config: {
-      origin: ['https://www.tnt-mkr.com'],
+      enabled: true,
+      origin: '*',
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       headers: ['Content-Type', 'Authorization', 'X-Guest-Session', 'Stripe-Signature'],
       credentials: true,
@@ -45,7 +46,9 @@ export default [
   },
   'strapi::security',
   'strapi::poweredBy',
-  'strapi::compression',
+  {
+    name: 'strapi::compression',
+  },
   'strapi::responses',
   'strapi::favicon',
   'strapi::public',
