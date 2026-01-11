@@ -36,16 +36,37 @@ const ORDER_HEADERS = [
   'Row ID',
 ];
 
+// Updated status colors for unified status system
+// Blue shades: pending through assembling (preparation stages)
+// Orange: packaged (ready to ship)
+// Yellow shades: shipped, in_transit, out_for_delivery
+// Green: delivered
+// Red: canceled
+// Purple: returned
 const STATUS_COLORS: Record<string, { red: number; green: number; blue: number }> = {
-  pending: { red: 1, green: 0.8, blue: 0.8 },           // Light red
-  paid: { red: 1, green: 0.9, blue: 0.8 },              // Light orange
-  processing: { red: 1, green: 0.95, blue: 0.8 },       // Yellow-orange
-  shipped: { red: 1, green: 1, blue: 0.8 },             // Yellow
-  in_transit: { red: 1, green: 1, blue: 0.8 },          // Yellow
-  out_for_delivery: { red: 0.9, green: 1, blue: 0.8 },  // Yellow-green
-  delivered: { red: 0.8, green: 1, blue: 0.8 },         // Light green
-  canceled: { red: 0.9, green: 0.9, blue: 0.9 },        // Gray
-  returned: { red: 0.9, green: 0.8, blue: 1 },          // Light purple
+  // Blue shades for preparation stages
+  pending: { red: 0.85, green: 0.91, blue: 0.98 },         // Light blue
+  paid: { red: 0.78, green: 0.87, blue: 0.97 },            // Slightly darker blue
+  printing: { red: 0.71, green: 0.83, blue: 0.96 },        // Medium blue
+  printed: { red: 0.64, green: 0.79, blue: 0.95 },         // Darker blue
+  assembling: { red: 0.56, green: 0.75, blue: 0.94 },      // Even darker blue
+  
+  // Orange for packaged
+  packaged: { red: 1, green: 0.85, blue: 0.7 },            // Orange
+  
+  // Yellow shades for shipping stages
+  shipped: { red: 1, green: 0.95, blue: 0.7 },             // Light yellow
+  in_transit: { red: 1, green: 0.92, blue: 0.6 },          // Yellow
+  out_for_delivery: { red: 1, green: 0.88, blue: 0.5 },    // Darker yellow
+  
+  // Green for delivered
+  delivered: { red: 0.8, green: 1, blue: 0.8 },            // Light green
+  
+  // Red for canceled
+  canceled: { red: 1, green: 0.8, blue: 0.8 },             // Light red
+  
+  // Purple for returned
+  returned: { red: 0.9, green: 0.8, blue: 1 },             // Light purple
 };
 
 export const initGoogleSheets = async (): Promise<boolean> => {

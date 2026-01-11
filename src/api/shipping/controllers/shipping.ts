@@ -169,8 +169,13 @@ async function sendShippingNotification(strapi: any, order: any) {
   }
 }
 
-// Valid order status values
-type OrderStatus = 'pending' | 'paid' | 'processing' | 'shipped' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'canceled' | 'returned';
+// Valid unified order status values
+type OrderStatus = 'pending' | 'paid' | 'printing' | 'printed' | 'assembling' | 'packaged' | 'shipped' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'canceled' | 'returned';
+
+// Helper function to check if status is a shipping status (should auto-update from carrier)
+function isShippingStatus(status: string): boolean {
+  return ['shipped', 'in_transit', 'out_for_delivery', 'delivered'].includes(status);
+}
 
 // Helper function to map EasyPost status to order status
 function mapTrackingStatusToOrderStatus(trackingStatus: string): OrderStatus {
@@ -310,15 +315,12 @@ export default {
       return ctx.forbidden('Admin access required');
     }
 
-    const { status, packing_status, search, page = 1, pageSize = 50 } = ctx.query;
+    const { status, search, page = 1, pageSize = 50 } = ctx.query;
 
     try {
       const filters: any = {};
       if (status) {
         filters.order_status = status;
-      }
-      if (packing_status) {
-        filters.packing_status = packing_status;
       }
       if (search) {
         filters.$or = [
@@ -398,7 +400,6 @@ export default {
       if (updateFields.shipping_box_id !== undefined) updateData.shipping_box = updateFields.shipping_box_id;
       if (updateFields.admin_notes !== undefined) updateData.admin_notes = updateFields.admin_notes;
       if (updateFields.admin_hidden !== undefined) updateData.admin_hidden = updateFields.admin_hidden;
-      if (updateFields.packing_status !== undefined) updateData.packing_status = updateFields.packing_status;
 
       if (Object.keys(updateData).length === 0) {
         return ctx.badRequest('No valid fields to update');
@@ -435,16 +436,20 @@ export default {
     }
   },
 
-  // Admin: Manually update order status (shipped, delivered, etc.)
+  // Admin: Update unified order status with optional tracking number
   async updateOrderStatus(ctx: Context) {
     if (!await isAdmin(ctx)) {
       return ctx.forbidden('Admin access required');
     }
 
     const { id } = ctx.params;
-    const { order_status } = ctx.request.body as { order_status: string };
+    const { order_status, tracking_number, carrier_service } = ctx.request.body as { 
+      order_status: string;
+      tracking_number?: string;
+      carrier_service?: string;
+    };
 
-    const validStatuses: OrderStatus[] = ['pending', 'paid', 'processing', 'shipped', 'in_transit', 'out_for_delivery', 'delivered', 'canceled', 'returned'];
+    const validStatuses: OrderStatus[] = ['pending', 'paid', 'printing', 'printed', 'assembling', 'packaged', 'shipped', 'in_transit', 'out_for_delivery', 'delivered', 'canceled', 'returned'];
     if (!order_status || !validStatuses.includes(order_status as OrderStatus)) {
       return ctx.badRequest(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
     }
@@ -473,9 +478,44 @@ export default {
         order_status: order_status,
       };
 
-      // If marking as shipped and not already shipped, set shipped_at
-      if (order_status === 'shipped' && !order.shipped_at) {
-        updateData.shipped_at = new Date().toISOString();
+      // If marking as shipped and tracking number provided
+      if (order_status === 'shipped') {
+        if (!order.shipped_at) {
+          updateData.shipped_at = new Date().toISOString();
+        }
+        
+        // Handle tracking number if provided
+        if (tracking_number && tracking_number.trim()) {
+          updateData.tracking_number = tracking_number.trim();
+          updateData.carrier_service = carrier_service || 'USPS';
+          
+          // Create EasyPost tracker for automatic updates
+          try {
+            const trackerResult = await easypostService.createTracker(tracking_number.trim(), carrier_service || 'USPS');
+            if (trackerResult.id) {
+              updateData.easypost_tracker_id = trackerResult.id;
+            }
+            
+            // If tracker already shows a different status, use that
+            if (trackerResult.status && trackerResult.status !== 'pre_transit') {
+              const mappedStatus = mapTrackingStatusToOrderStatus(trackerResult.status);
+              if (mappedStatus !== 'shipped') {
+                updateData.order_status = mappedStatus;
+              }
+            }
+            
+            if (trackerResult.est_delivery_date) {
+              updateData.estimated_delivery_date = trackerResult.est_delivery_date;
+            }
+            
+            if (trackerResult.status === 'delivered' && trackerResult.delivered_at) {
+              updateData.delivered_at = trackerResult.delivered_at;
+            }
+          } catch (trackerError) {
+            strapi.log.error('Failed to create EasyPost tracker:', trackerError);
+            // Continue without tracker - order will still be marked as shipped
+          }
+        }
       }
 
       // If marking as delivered, set delivered_at
@@ -498,6 +538,20 @@ export default {
         },
       });
 
+      // Send shipping notification if tracking was added and not already sent
+      let emailResult: { success: boolean; reason?: string; sentTo?: string; bcc?: string; error?: string } = { success: false, reason: 'not_attempted' };
+      if (tracking_number && tracking_number.trim() && !order.shipping_notification_sent) {
+        const customerEmail = order.customer_email || order.guest_email || order.user?.email;
+        if (customerEmail) {
+          emailResult = await sendShippingNotification(strapi, updatedOrder);
+          if (emailResult.success) {
+            await strapi.entityService.update('api::order.order', id, {
+              data: { shipping_notification_sent: true },
+            });
+          }
+        }
+      }
+
       // Update Google Sheet
       try {
         await googleSheets.upsertOrder(updatedOrder as any);
@@ -505,13 +559,16 @@ export default {
         strapi.log.error('Failed to update Google Sheet:', sheetError);
       }
 
-      strapi.log.info(`[MANUAL STATUS UPDATE] Order ${order.order_number}: Changed status from "${previousStatus}" to "${order_status}"`);
+      strapi.log.info(`[STATUS UPDATE] Order ${order.order_number}: Changed status from "${previousStatus}" to "${updateData.order_status}"${tracking_number ? ` with tracking ${tracking_number}` : ''}`);
 
       return ctx.send({
         order: updatedOrder,
         previous_status: previousStatus,
-        new_status: order_status,
-        message: `Order status updated from "${previousStatus}" to "${order_status}"`,
+        new_status: updateData.order_status,
+        tracking_added: !!tracking_number,
+        email_sent: emailResult.success,
+        email_details: emailResult,
+        message: `Order status updated from "${previousStatus}" to "${updateData.order_status}"`,
       });
     } catch (error: any) {
       strapi.log.error('Update order status error:', error);
@@ -519,7 +576,7 @@ export default {
     }
   },
 
-  // Admin: Mark order as shipped and send notification
+  // Admin: Mark order as shipped and send notification (legacy endpoint, still works)
   async markAsShipped(ctx: Context) {
     if (!await isAdmin(ctx)) {
       return ctx.forbidden('Admin access required');
@@ -1002,10 +1059,10 @@ export default {
           }
         }
       } else {
+        // Get orders that are packaged and ready to ship (no tracking yet)
         orders = await strapi.entityService.findMany('api::order.order', {
           filters: {
-            packing_status: 'packed',
-            order_status: { $in: ['paid', 'processing'] },
+            order_status: 'packaged',
             tracking_number: { $null: true },
             admin_hidden: { $ne: true },
           },
@@ -1018,7 +1075,7 @@ export default {
       }
 
       if (orders.length === 0) {
-        return ctx.badRequest('No orders to export. Make sure orders are marked as "Packed & Ready" and have no tracking number.');
+        return ctx.badRequest('No orders to export. Make sure orders are marked as "Packaged" and have no tracking number.');
       }
 
       try {

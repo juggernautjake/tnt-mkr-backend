@@ -26,7 +26,10 @@
       "enum": [
         "pending",
         "paid",
-        "processing",
+        "printing",
+        "printed",
+        "assembling",
+        "packaged",
         "shipped",
         "in_transit",
         "out_for_delivery",
@@ -34,19 +37,8 @@
         "canceled",
         "returned"
       ],
-      "default": "pending"
-    },
-    "packing_status": {
-      "type": "enumeration",
-      "enum": [
-        "not_started",
-        "printing",
-        "printed",
-        "assembling",
-        "packed"
-      ],
-      "default": "not_started",
-      "description": "Current packing/fulfillment status of the order"
+      "default": "pending",
+      "description": "Unified order status combining packing and shipping stages"
     },
     "payment_status": {
       "type": "enumeration",
