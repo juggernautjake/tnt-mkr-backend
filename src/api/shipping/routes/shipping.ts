@@ -109,7 +109,7 @@ export default {
     {
       method: 'POST',
       path: '/shipping/admin/sync-google-sheets',
-      handler: 'shipping.syncGoogleSheets',
+      handler: 'shipping.syncToGoogleSheets',
       config: {
         policies: [],
       },

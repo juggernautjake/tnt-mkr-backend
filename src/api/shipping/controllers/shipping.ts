@@ -152,7 +152,6 @@ async function sendShippingNotification(strapi: any, order: any) {
 `;
 
   try {
-    // Send email with BCC to customer service
     await strapi.plugins['email'].services.email.send({
       to: customerEmail,
       bcc: customerServiceEmail,
@@ -173,11 +172,6 @@ async function sendShippingNotification(strapi: any, order: any) {
 // Valid unified order status values
 type OrderStatus = 'pending' | 'paid' | 'printing' | 'printed' | 'assembling' | 'packaged' | 'shipped' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'canceled' | 'returned';
 
-// Helper function to check if status is a shipping status (should auto-update from carrier)
-function isShippingStatus(status: string): boolean {
-  return ['shipped', 'in_transit', 'out_for_delivery', 'delivered'].includes(status);
-}
-
 // Helper function to map EasyPost status to order status
 function mapTrackingStatusToOrderStatus(trackingStatus: string): OrderStatus {
   const statusMap: Record<string, OrderStatus> = {
@@ -194,7 +188,92 @@ function mapTrackingStatusToOrderStatus(trackingStatus: string): OrderStatus {
   return statusMap[trackingStatus] || 'shipped';
 }
 
+// Helper function to convert state name to state code
+function getStateCode(stateName: string): string {
+  const stateMap: Record<string, string> = {
+    'alabama': 'AL', 'arizona': 'AZ', 'arkansas': 'AR', 'california': 'CA',
+    'colorado': 'CO', 'connecticut': 'CT', 'delaware': 'DE', 'florida': 'FL',
+    'georgia': 'GA', 'idaho': 'ID', 'illinois': 'IL', 'indiana': 'IN',
+    'iowa': 'IA', 'kansas': 'KS', 'kentucky': 'KY', 'louisiana': 'LA',
+    'maine': 'ME', 'maryland': 'MD', 'massachusetts': 'MA', 'michigan': 'MI',
+    'minnesota': 'MN', 'mississippi': 'MS', 'missouri': 'MO', 'montana': 'MT',
+    'nebraska': 'NE', 'nevada': 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ',
+    'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND',
+    'ohio': 'OH', 'oklahoma': 'OK', 'oregon': 'OR', 'pennsylvania': 'PA',
+    'rhode island': 'RI', 'south carolina': 'SC', 'south dakota': 'SD',
+    'tennessee': 'TN', 'texas': 'TX', 'utah': 'UT', 'vermont': 'VT',
+    'virginia': 'VA', 'washington': 'WA', 'west virginia': 'WV',
+    'wisconsin': 'WI', 'wyoming': 'WY', 'district of columbia': 'DC',
+  };
+  
+  if (!stateName) return '';
+  const normalized = stateName.toLowerCase().trim();
+  return stateMap[normalized] || stateName;
+}
+
 export default {
+  // Get address suggestions for autocomplete
+  async getAddressSuggestions(ctx: Context) {
+    const { query, city, state } = ctx.request.body as { query: string; city?: string; state?: string };
+
+    if (!query || query.length < 5) {
+      return ctx.send({ suggestions: [] });
+    }
+
+    try {
+      // Use Nominatim (OpenStreetMap) for free geocoding/autocomplete
+      const searchQuery = encodeURIComponent(
+        `${query}${city ? ', ' + city : ''}${state ? ', ' + state : ''}, USA`
+      );
+      
+      const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${searchQuery}&format=json&addressdetails=1&countrycodes=us&limit=5`;
+      
+      const response = await fetch(nominatimUrl, {
+        headers: {
+          'User-Agent': 'TNT-MKR-Checkout/1.0',
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        strapi.log.warn(`Nominatim API returned ${response.status}`);
+        return ctx.send({ suggestions: [] });
+      }
+
+      const results = await response.json();
+      
+      // Transform Nominatim results to our suggestion format
+      const suggestions = results
+        .filter((result: any) => {
+          const addr = result.address;
+          return addr && addr.house_number && addr.road && addr.postcode;
+        })
+        .map((result: any, index: number) => {
+          const addr = result.address;
+          const houseNumber = addr.house_number || '';
+          const road = addr.road || addr.street || '';
+          const cityName = addr.city || addr.town || addr.village || addr.municipality || '';
+          const stateCode = getStateCode(addr.state) || addr.state || '';
+          const postcode = addr.postcode || '';
+          
+          return {
+            id: `suggestion_${index}_${Date.now()}`,
+            street: `${houseNumber} ${road}`.trim(),
+            city: cityName,
+            state: stateCode,
+            postal_code: postcode.split('-')[0],
+            full_address: result.display_name,
+          };
+        })
+        .filter((s: any) => s.street && s.city && s.state && s.postal_code);
+
+      return ctx.send({ suggestions });
+    } catch (error: any) {
+      strapi.log.error('Address suggestions error:', error);
+      return ctx.send({ suggestions: [] });
+    }
+  },
+
   // Validate an address
   async validateAddress(ctx: Context) {
     const { address } = ctx.request.body as { address: any };
@@ -448,7 +527,7 @@ export default {
       order_status, 
       tracking_number, 
       carrier_service,
-      send_email = false  // NEW: Optional email notification flag
+      send_email = false
     } = ctx.request.body as { 
       order_status: string;
       tracking_number?: string;
@@ -485,25 +564,21 @@ export default {
         order_status: order_status,
       };
 
-      // If marking as shipped and tracking number provided
       if (order_status === 'shipped') {
         if (!order.shipped_at) {
           updateData.shipped_at = new Date().toISOString();
         }
         
-        // Handle tracking number if provided
         if (tracking_number && tracking_number.trim()) {
           updateData.tracking_number = tracking_number.trim();
           updateData.carrier_service = carrier_service || 'USPS';
           
-          // Create EasyPost tracker for automatic updates
           try {
             const trackerResult = await easypostService.createTracker(tracking_number.trim(), carrier_service || 'USPS');
             if (trackerResult.id) {
               updateData.easypost_tracker_id = trackerResult.id;
             }
             
-            // If tracker already shows a different status, use that
             if (trackerResult.status && trackerResult.status !== 'pre_transit') {
               const mappedStatus = mapTrackingStatusToOrderStatus(trackerResult.status);
               if (mappedStatus !== 'shipped') {
@@ -520,12 +595,10 @@ export default {
             }
           } catch (trackerError) {
             strapi.log.error('Failed to create EasyPost tracker:', trackerError);
-            // Continue without tracker - order will still be marked as shipped
           }
         }
       }
 
-      // If marking as delivered, set delivered_at
       if (order_status === 'delivered' && !order.delivered_at) {
         updateData.delivered_at = new Date().toISOString();
       }
@@ -545,11 +618,9 @@ export default {
         },
       });
 
-      // Handle email notification
       let emailResult: { success: boolean; reason?: string; sentTo?: string; bcc?: string; error?: string } = { success: false, reason: 'not_requested' };
       
       if (send_email) {
-        // Use the new email templates service for status-specific emails
         const finalStatus = updateData.order_status || order_status;
         emailResult = await orderEmailTemplates.sendStatusNotificationEmail(
           strapi,
@@ -557,15 +628,12 @@ export default {
           finalStatus
         );
         
-        // Mark shipping notification as sent if this is a shipped status with tracking
         if (emailResult.success && finalStatus === 'shipped' && tracking_number) {
           await strapi.entityService.update('api::order.order', id, {
             data: { shipping_notification_sent: true },
           });
         }
       } else if (tracking_number && tracking_number.trim() && !order.shipping_notification_sent) {
-        // Legacy behavior: auto-send shipping notification when tracking is added (for backward compatibility)
-        // This only triggers if send_email is not explicitly set
         const customerEmail = order.customer_email || order.guest_email || order.user?.email;
         if (customerEmail) {
           emailResult = await sendShippingNotification(strapi, updatedOrder);
@@ -577,7 +645,6 @@ export default {
         }
       }
 
-      // Update Google Sheet
       try {
         await googleSheets.upsertOrder(updatedOrder as any);
       } catch (sheetError) {
@@ -601,7 +668,7 @@ export default {
     }
   },
 
-  // Admin: Mark order as shipped and send notification (legacy endpoint, still works)
+  // Admin: Mark order as shipped and send notification
   async markAsShipped(ctx: Context) {
     if (!await isAdmin(ctx)) {
       return ctx.forbidden('Admin access required');
@@ -877,21 +944,14 @@ export default {
               } catch (sheetError) {
                 strapi.log.error(`Failed to update Google Sheet for order ${order.order_number}:`, sheetError);
               }
-
-              results.push({
-                order_number: order.order_number,
-                success: true,
-                previous_status: order.order_status,
-                new_status: newOrderStatus,
-              });
-            } else {
-              results.push({
-                order_number: order.order_number,
-                success: true,
-                previous_status: order.order_status,
-                new_status: newOrderStatus,
-              });
             }
+
+            results.push({
+              order_number: order.order_number,
+              success: true,
+              previous_status: order.order_status,
+              new_status: newOrderStatus,
+            });
           } else {
             results.push({
               order_number: order.order_number,
@@ -1060,7 +1120,7 @@ export default {
     });
   },
 
-  // Admin: Export orders for Pirate Ship (returns CSV file)
+  // Admin: Export orders for Pirate Ship
   async exportForPirateShip(ctx: Context) {
     if (!await isAdmin(ctx)) {
       return ctx.forbidden('Admin access required');
@@ -1084,7 +1144,6 @@ export default {
           }
         }
       } else {
-        // Get orders that are packaged and ready to ship (no tracking yet)
         orders = await strapi.entityService.findMany('api::order.order', {
           filters: {
             order_status: 'packaged',
@@ -1196,7 +1255,7 @@ export default {
     }
   },
 
-  // EasyPost tracking webhook handler - sends automatic emails for carrier status updates
+  // EasyPost tracking webhook handler
   async trackingWebhook(ctx: Context) {
     const { result } = ctx.request.body as any;
 
@@ -1235,7 +1294,6 @@ export default {
       const previousStatus = order.order_status;
       const newOrderStatus = mapTrackingStatusToOrderStatus(status);
 
-      // Only process if status actually changed
       if (previousStatus === newOrderStatus) {
         strapi.log.info(`[TRACKING WEBHOOK] No status change for ${order.order_number} (still ${previousStatus})`);
         return ctx.send({ received: true, status_unchanged: true });
@@ -1245,12 +1303,10 @@ export default {
         order_status: newOrderStatus,
       };
 
-      // Update estimated delivery date if provided
       if (estDeliveryDate) {
         updateData.estimated_delivery_date = estDeliveryDate;
       }
 
-      // Set delivered_at timestamp for delivered status
       if (status === 'delivered') {
         updateData.delivered_at = result.carrier_detail?.delivered_at || new Date().toISOString();
       }
@@ -1272,8 +1328,6 @@ export default {
 
       strapi.log.info(`[TRACKING WEBHOOK] Updated order ${order.order_number}: ${previousStatus} → ${newOrderStatus}`);
 
-      // Send automatic email for carrier-triggered status updates
-      // Only for shipping statuses: in_transit, out_for_delivery, delivered
       const autoEmailStatuses = ['in_transit', 'out_for_delivery', 'delivered'];
       let emailResult: { success: boolean; reason?: string; sentTo?: string; error?: string } = { success: false, reason: 'not_auto_email_status' };
 
@@ -1291,7 +1345,6 @@ export default {
         }
       }
 
-      // Update Google Sheet
       try {
         await googleSheets.upsertOrder(updatedOrder as any);
       } catch (sheetError) {
