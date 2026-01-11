@@ -36,6 +36,18 @@
       ],
       "default": "pending"
     },
+    "packing_status": {
+      "type": "enumeration",
+      "enum": [
+        "not_started",
+        "printing",
+        "printed",
+        "assembling",
+        "packed"
+      ],
+      "default": "not_started",
+      "description": "Current packing/fulfillment status of the order"
+    },
     "payment_status": {
       "type": "enumeration",
       "enum": [
