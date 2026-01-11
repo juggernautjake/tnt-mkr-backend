@@ -81,5 +81,41 @@ export default {
         policies: [],
       },
     },
+    // Google Sheets sync route
+    {
+      method: 'POST',
+      path: '/shipping/admin/sync-google-sheets',
+      handler: 'shipping.syncToGoogleSheets',
+      config: {
+        policies: [],
+      },
+    },
+    // Refresh tracking status for an order
+    {
+      method: 'POST',
+      path: '/shipping/admin/orders/:id/refresh-tracking',
+      handler: 'shipping.refreshTrackingStatus',
+      config: {
+        policies: [],
+      },
+    },
+    // Refresh all tracking statuses
+    {
+      method: 'POST',
+      path: '/shipping/admin/refresh-all-tracking',
+      handler: 'shipping.refreshAllTrackingStatuses',
+      config: {
+        policies: [],
+      },
+    },
+    // Test email configuration
+    {
+      method: 'POST',
+      path: '/shipping/admin/test-email',
+      handler: 'shipping.testEmail',
+      config: {
+        policies: [],
+      },
+    },
   ],
 };

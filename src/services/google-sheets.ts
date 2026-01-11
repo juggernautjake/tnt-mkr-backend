@@ -284,7 +284,7 @@ export const upsertOrder = async (order: OrderData): Promise<number | null> => {
     const itemSummary = items.map(item => `${item.product?.name || 'Item'} x${item.quantity}`).join(', ');
     const itemDetails = items.map(item => {
       const parts = item.order_item_parts?.map(p => `${p.product_part?.name}: ${p.color?.name}`).join(', ') || '';
-      return `${item.product?.name || 'Item'} x${item.quantity} @ ${formatCurrency(item.price)}${parts ? ` (${parts})` : ''}`;
+      return `${item.product?.name || 'Item'} x${item.quantity} @ ${formatCurrency(item.price * 100)}${parts ? ` (${parts})` : ''}`;
     }).join(' | ');
 
     const dimensions = order.package_length && order.package_width && order.package_height
