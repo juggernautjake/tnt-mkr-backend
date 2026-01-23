@@ -30,6 +30,15 @@ export default {
         policies: [],
       },
     },
+    // Debug endpoint (temporary - helps diagnose auth issues)
+    {
+      method: 'GET',
+      path: '/shipping/admin/debug-auth',
+      handler: 'shipping.debugAuth',
+      config: {
+        policies: [],
+      },
+    },
     // Admin routes (require authentication)
     {
       method: 'GET',

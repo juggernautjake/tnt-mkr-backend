@@ -7,21 +7,52 @@ import orderEmailTemplates from '../../../services/order-email-templates';
 // Helper function to check if user is admin
 async function isAdmin(ctx: Context): Promise<boolean> {
   const { user } = ctx.state;
-  if (!user) return false;
+  
+  // Debug: Log the user state
+  strapi.log.info(`[ADMIN CHECK] User state exists: ${!!user}`);
+  
+  if (!user) {
+    strapi.log.warn('[ADMIN CHECK] No user in context state - authentication may have failed');
+    return false;
+  }
+  
+  strapi.log.info(`[ADMIN CHECK] User ID: ${user.id}, checking role...`);
   
   try {
     const userWithRole = await strapi.entityService.findOne('plugin::users-permissions.user', user.id, {
       populate: ['role'],
     });
     
-    if (!userWithRole || !userWithRole.role) return false;
+    if (!userWithRole) {
+      strapi.log.warn(`[ADMIN CHECK] User ${user.id} not found in database`);
+      return false;
+    }
     
-    const roleName = (userWithRole.role as any).name?.toLowerCase();
-    const roleType = (userWithRole.role as any).type?.toLowerCase();
+    if (!userWithRole.role) {
+      strapi.log.warn(`[ADMIN CHECK] User ${user.id} has no role assigned`);
+      return false;
+    }
     
-    return roleName === 'admin' || roleType === 'admin';
+    const role = userWithRole.role as any;
+    const roleName = role.name?.toLowerCase() || '';
+    const roleType = role.type?.toLowerCase() || '';
+    
+    strapi.log.info(`[ADMIN CHECK] User ${user.id} - Role name: "${role.name}", Role type: "${role.type}"`);
+    
+    // Check for various admin role patterns
+    const isAdminRole = 
+      roleName === 'admin' || 
+      roleName === 'administrator' ||
+      roleName.includes('admin') ||
+      roleType === 'admin' ||
+      roleType === 'administrator' ||
+      roleType.includes('admin');
+    
+    strapi.log.info(`[ADMIN CHECK] User ${user.id} - Is admin: ${isAdminRole}`);
+    
+    return isAdminRole;
   } catch (error) {
-    strapi.log.error('Error checking admin role:', error);
+    strapi.log.error('[ADMIN CHECK] Error checking admin role:', error);
     return false;
   }
 }
@@ -1262,9 +1293,14 @@ export default {
 
   // Admin: Send custom message to customer
   async sendCustomMessage(ctx: Context) {
+    strapi.log.info('[CUSTOM MESSAGE] Received request to send custom message');
+    
     if (!await isAdmin(ctx)) {
+      strapi.log.warn('[CUSTOM MESSAGE] Admin check failed - returning 403');
       return ctx.forbidden('Admin access required');
     }
+
+    strapi.log.info('[CUSTOM MESSAGE] Admin check passed');
 
     const { id } = ctx.params;
     const { message, subject } = ctx.request.body as { message: string; subject?: string };
@@ -1319,6 +1355,45 @@ export default {
     } catch (error: any) {
       strapi.log.error('Send custom message error:', error);
       return ctx.internalServerError('Failed to send custom message', { error: error.message });
+    }
+  },
+
+  // Debug endpoint to check auth status (temporary - remove in production)
+  async debugAuth(ctx: Context) {
+    const { user } = ctx.state;
+    
+    if (!user) {
+      return ctx.send({
+        authenticated: false,
+        message: 'No user in context - JWT may be invalid or missing',
+        headers: {
+          authorization: ctx.request.header.authorization ? 'Present (redacted)' : 'Missing',
+        },
+      });
+    }
+
+    try {
+      const userWithRole = await strapi.entityService.findOne('plugin::users-permissions.user', user.id, {
+        populate: ['role'],
+      });
+
+      return ctx.send({
+        authenticated: true,
+        user_id: user.id,
+        user_email: (userWithRole as any)?.email,
+        role: userWithRole?.role ? {
+          id: (userWithRole.role as any).id,
+          name: (userWithRole.role as any).name,
+          type: (userWithRole.role as any).type,
+        } : null,
+        is_admin: await isAdmin(ctx),
+      });
+    } catch (error: any) {
+      return ctx.send({
+        authenticated: true,
+        user_id: user.id,
+        error: error.message,
+      });
     }
   },
 };
