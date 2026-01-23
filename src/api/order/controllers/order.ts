@@ -2,7 +2,6 @@ import { factories } from '@strapi/strapi';
 import { errors } from '@strapi/utils';
 import { Context } from 'koa';
 import Stripe from 'stripe';
-import { v4 as uuidv4 } from 'uuid';
 
 const { ApplicationError, ValidationError, NotFoundError } = errors;
 
@@ -23,6 +22,7 @@ interface CartItem {
   quantity: number;
   price: string;
   effective_price: number;
+  base_price: string;
   is_additional_part?: boolean;
   colors?: Array<{ id: number; name: string }>;
   engravings?: any[];
@@ -42,7 +42,7 @@ interface OrderItemInput {
 
 interface OrderInput {
   order_number: string;
-  shipping_method: number;
+  shipping_method?: number | null;
   discount_code: number | null;
   user: number | null;
   guest_email: string | null;
@@ -61,6 +61,10 @@ interface OrderInput {
   discount_total: number;
   payment_last_four: string;
   confirmation_email_sent: boolean;
+  carrier_service?: string;
+  estimated_delivery_date?: string;
+  easypost_shipment_id?: string;
+  shipping_rate_id?: string;
 }
 
 export default factories.createCoreController('api::order.order', ({ strapi }) => ({
@@ -68,8 +72,14 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
     const { data } = ctx.request.body as { data: any };
     const { user } = ctx.state;
 
-    if (!data.cartId || !data.shippingMethodId || !data.paymentMethod) {
-      throw new ValidationError('cartId, shippingMethodId, and paymentMethod are required');
+    // Validate required fields - now accepts either shippingMethodId OR shipping_cost
+    if (!data.cartId || !data.paymentMethod) {
+      throw new ValidationError('cartId and paymentMethod are required');
+    }
+
+    // Must have either old shipping method OR new EasyPost shipping cost
+    if (!data.shippingMethodId && data.shipping_cost === undefined) {
+      throw new ValidationError('Either shippingMethodId or shipping_cost is required');
     }
 
     try {
@@ -95,11 +105,26 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
         throw new ValidationError('No items to order');
       }
 
-      const shippingMethod = await strapi.entityService.findOne('api::shipping-option.shipping-option', data.shippingMethodId, {
-        fields: ['baseCost', 'costPerItem'],
-      });
-      if (!shippingMethod) {
-        throw new ValidationError('Invalid shippingMethodId');
+      // Handle shipping cost - support both old (shippingMethodId) and new (EasyPost) methods
+      let shippingCents: number;
+      let shippingMethodId: number | null = null;
+
+      if (data.shippingMethodId) {
+        // Legacy: Use shipping-option entity
+        const shippingMethod = await strapi.entityService.findOne('api::shipping-option.shipping-option', data.shippingMethodId, {
+          fields: ['baseCost', 'costPerItem'],
+        });
+        if (!shippingMethod) {
+          throw new ValidationError('Invalid shippingMethodId');
+        }
+        shippingMethodId = Number(data.shippingMethodId);
+        const totalItems = data.order_items.reduce((sum: number, item: any) => sum + item.quantity, 0);
+        const baseCostCents = Math.round(shippingMethod.baseCost * 100);
+        const costPerItemCents = Math.round(shippingMethod.costPerItem * 100);
+        shippingCents = baseCostCents + costPerItemCents * (totalItems - 1);
+      } else {
+        // New: Use EasyPost shipping cost from frontend (already in cents)
+        shippingCents = data.shipping_cost;
       }
 
       const currentDate = new Date().toISOString().split('T')[0];
@@ -136,10 +161,6 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
         (sum: number, item: OrderItemInput) => sum + item.price * item.quantity,
         0
       );
-      const totalItems = orderItemsData.reduce((sum: number, item: OrderItemInput) => sum + item.quantity, 0);
-      const baseCostCents = Math.round(shippingMethod.baseCost * 100);
-      const costPerItemCents = Math.round(shippingMethod.costPerItem * 100);
-      const shippingCents = data.shipping_cost || (baseCostCents + costPerItemCents * (totalItems - 1));
       const taxRate = process.env.TAX_RATE ? parseFloat(process.env.TAX_RATE) : 0.0825;
       const taxCents = data.sales_tax || Math.round(subtotalCents * taxRate);
       const transactionFeeCents = data.transaction_fee || 50;
@@ -149,8 +170,6 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
       const orderItemsWithBasePrice = await Promise.all(orderItemsData.map(async (item) => {
         // For additional parts, get base price from the part itself
         if (item.is_additional_part) {
-          // The base_price should already be correct from the cart item
-          // For additional parts, base_price comes from part.price
           const cartItem = item.cart_item_id
             ? cart.cart_items.find((ci: CartItem) => ci.id.toString() === item.cart_item_id)
             : cart.cart_items.find((ci: CartItem) => ci.product.id === item.product && ci.is_additional_part);
@@ -207,7 +226,7 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
       const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       const orderData: OrderInput = {
         order_number: orderNumber,
-        shipping_method: Number(data.shippingMethodId),
+        shipping_method: shippingMethodId,
         discount_code: discountCodeId,
         user: user?.id || null,
         guest_email: !user ? data.guest_email : null,
@@ -226,6 +245,11 @@ export default factories.createCoreController('api::order.order', ({ strapi }) =
         discount_total: discountsCents,
         payment_last_four: '',
         confirmation_email_sent: false,
+        // EasyPost fields
+        carrier_service: data.carrier_service || null,
+        estimated_delivery_date: data.estimated_delivery_date || null,
+        easypost_shipment_id: data.easypost_shipment_id || null,
+        shipping_rate_id: data.shipping_rate_id || null,
       };
 
       const order = await strapi.entityService.create('api::order.order', {

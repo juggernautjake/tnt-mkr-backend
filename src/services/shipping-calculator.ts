@@ -21,7 +21,7 @@ const BOX_SIZE_THRESHOLDS = {
   large: { maxPriority: 30, handlingFeeCents: 400 },
 };
 
-// Improved fallback rates closer to actual USPS rates
+// Fallback rates - ONLY USPS Ground Advantage, Priority, and Express
 const FALLBACK_RATES: Record<string, { base: Record<string, number>; per_oz: Record<string, number> }> = {
   ground_advantage: {
     base: {
@@ -249,6 +249,45 @@ async function calculatePackages(cartItems: CartItem[], boxes: ShippingBox[]): P
   return packages;
 }
 
+// Filter rates to only include USPS Ground Advantage, Priority, and Express
+function filterUSPSRates(rates: any[]): any[] {
+  return rates.filter((rate: any) => {
+    if (rate.carrier !== 'USPS') return false;
+    
+    const serviceLower = rate.service.toLowerCase();
+    
+    // Match Ground Advantage
+    if (serviceLower.includes('ground') && serviceLower.includes('advantage')) {
+      return true;
+    }
+    
+    // Match Priority Mail (but not Priority Mail Express)
+    if (serviceLower.includes('priority') && !serviceLower.includes('express')) {
+      return true;
+    }
+    
+    // Match Priority Mail Express or Express
+    if (serviceLower.includes('express')) {
+      return true;
+    }
+    
+    return false;
+  });
+}
+
+// Sort USPS rates in order: Ground Advantage, Priority, Express
+function sortUSPSRates(rates: any[]): any[] {
+  const getServiceOrder = (service: string): number => {
+    const serviceLower = service.toLowerCase();
+    if (serviceLower.includes('ground') && serviceLower.includes('advantage')) return 0;
+    if (serviceLower.includes('priority') && !serviceLower.includes('express')) return 1;
+    if (serviceLower.includes('express')) return 2;
+    return 99;
+  };
+  
+  return [...rates].sort((a, b) => getServiceOrder(a.service) - getServiceOrder(b.service));
+}
+
 // Calculate fallback rates when EasyPost is unavailable
 function calculateFallbackRates(packages: PackageInfo[], destinationState: string): ShippingRate[] {
   const zone = getZone(destinationState);
@@ -256,10 +295,11 @@ function calculateFallbackRates(packages: PackageInfo[], destinationState: strin
 
   const totalHandlingFee = packages.reduce((sum, pkg) => sum + getHandlingFeeCents(pkg.box_priority), 0);
 
+  // Only generate rates for the 3 USPS services we want
   const services = [
     { key: 'ground_advantage', name: 'USPS Ground Advantage', days: zone === 'local' ? 3 : zone === 'regional' ? 4 : zone === 'mid' ? 5 : 6 },
     { key: 'priority', name: 'USPS Priority Mail', days: zone === 'local' ? 2 : zone === 'regional' ? 2 : zone === 'mid' ? 3 : 3 },
-    { key: 'express', name: 'USPS Express Mail', days: zone === 'local' ? 1 : 2 },
+    { key: 'express', name: 'USPS Priority Mail Express', days: zone === 'local' ? 1 : 2 },
   ];
 
   for (const service of services) {
@@ -286,8 +326,6 @@ function calculateFallbackRates(packages: PackageInfo[], destinationState: strin
       delivery_guarantee: service.key === 'express',
     });
   }
-
-  rates.sort((a, b) => a.rate_with_handling_cents - b.rate_with_handling_cents);
 
   return rates;
 }
@@ -331,7 +369,13 @@ async function getShippingRates(
     if (easypostRates.rates && easypostRates.rates.length > 0) {
       const totalHandlingFee = packages.reduce((sum, pkg) => sum + getHandlingFeeCents(pkg.box_priority), 0);
 
-      const ratesWithHandling: ShippingRate[] = easypostRates.rates.map((rate: any) => ({
+      // Filter to only USPS Ground Advantage, Priority, and Express
+      const filteredRates = filterUSPSRates(easypostRates.rates);
+      
+      // Sort in order: Ground Advantage, Priority, Express
+      const sortedRates = sortUSPSRates(filteredRates);
+
+      const ratesWithHandling: ShippingRate[] = sortedRates.map((rate: any) => ({
         id: rate.id,
         carrier: rate.carrier,
         service: rate.service,
@@ -342,25 +386,26 @@ async function getShippingRates(
         delivery_guarantee: rate.delivery_date_guaranteed || false,
       }));
 
-      ratesWithHandling.sort((a, b) => a.rate_with_handling_cents - b.rate_with_handling_cents);
+      // If we have at least one rate after filtering, use EasyPost results
+      if (ratesWithHandling.length > 0) {
+        const result: RateResult = {
+          rates: ratesWithHandling,
+          packages,
+          shipment_id: easypostRates.shipment_ids?.[0],
+          cached: false,
+          fallback_used: false,
+        };
 
-      const result: RateResult = {
-        rates: ratesWithHandling,
-        packages,
-        shipment_id: easypostRates.shipment_ids?.[0], // Use first shipment ID from array
-        cached: false,
-        fallback_used: false,
-      };
-
-      if (redis) {
-        try {
-          await redis.setex(cacheKey, 1200, JSON.stringify(result));
-        } catch (e) {
-          // Cache error, continue
+        if (redis) {
+          try {
+            await redis.setex(cacheKey, 1200, JSON.stringify(result));
+          } catch (e) {
+            // Cache error, continue
+          }
         }
-      }
 
-      return result;
+        return result;
+      }
     }
   } catch (error) {
     console.error('EasyPost rate fetch failed, using fallback:', error);

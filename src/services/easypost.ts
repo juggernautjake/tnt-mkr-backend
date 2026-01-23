@@ -28,16 +28,6 @@ interface AddressInput {
   company?: string;
 }
 
-interface AddressSuggestion {
-  id: string;
-  street: string;
-  street2?: string;
-  city: string;
-  state: string;
-  postal_code: string;
-  full_address: string;
-}
-
 interface AddressValidationResult {
   is_valid: boolean;
   easypost_id?: string;
@@ -65,43 +55,6 @@ interface TrackingResult {
   }>;
 }
 
-// Common US street types for suggestion generation
-const STREET_TYPES = ['St', 'Ave', 'Blvd', 'Dr', 'Ln', 'Rd', 'Way', 'Ct', 'Pl', 'Cir'];
-
-// Common address patterns for parsing
-const parseAddressComponents = (input: string): { number?: string; street?: string; city?: string; state?: string; zip?: string } => {
-  const parts = input.split(',').map(p => p.trim());
-  const result: { number?: string; street?: string; city?: string; state?: string; zip?: string } = {};
-  
-  if (parts.length >= 1) {
-    // First part is usually street address
-    const streetMatch = parts[0].match(/^(\d+)\s+(.+)/);
-    if (streetMatch) {
-      result.number = streetMatch[1];
-      result.street = streetMatch[2];
-    } else {
-      result.street = parts[0];
-    }
-  }
-  
-  if (parts.length >= 2) {
-    result.city = parts[1];
-  }
-  
-  if (parts.length >= 3) {
-    // Check for state and zip in last part
-    const stateZipMatch = parts[2].match(/([A-Z]{2})\s*(\d{5})?/i);
-    if (stateZipMatch) {
-      result.state = stateZipMatch[1].toUpperCase();
-      result.zip = stateZipMatch[2];
-    } else {
-      result.state = parts[2];
-    }
-  }
-  
-  return result;
-};
-
 const easypostService = {
   /**
    * Check if a state code is in the continental US
@@ -110,145 +63,6 @@ const easypostService = {
     if (!state) return false;
     const upperState = state.toUpperCase().trim();
     return !NON_CONTINENTAL_US.includes(upperState);
-  },
-
-  /**
-   * Get address suggestions based on partial input
-   * Uses EasyPost verification with fallback to pattern-based suggestions
-   */
-  async getAddressSuggestions(
-    partialAddress: string,
-    city: string = '',
-    state: string = '',
-    postalCode: string = ''
-  ): Promise<AddressSuggestion[]> {
-    const suggestions: AddressSuggestion[] = [];
-    
-    try {
-      // If we have enough info, try to validate and get suggestions
-      if (partialAddress.length >= 5) {
-        const client = getClient();
-        
-        // Parse the input to extract components
-        const parsed = parseAddressComponents(partialAddress);
-        
-        // Build address for validation
-        const addressToValidate = {
-          street1: parsed.street ? `${parsed.number || ''} ${parsed.street}`.trim() : partialAddress,
-          city: parsed.city || city || '',
-          state: parsed.state || state || '',
-          zip: parsed.zip || postalCode || '',
-          country: 'US',
-        };
-
-        // Only proceed if we have minimum required fields
-        if (addressToValidate.street1.length >= 5) {
-          try {
-            const easypostAddress = await client.Address.create({
-              ...addressToValidate,
-              verify: ['delivery'],
-            });
-
-            // If we got a verified address, add it as a suggestion
-            if (easypostAddress.verifications?.delivery?.success || easypostAddress.street1) {
-              const suggestion: AddressSuggestion = {
-                id: easypostAddress.id || `suggestion_${Date.now()}`,
-                street: easypostAddress.street1 || addressToValidate.street1,
-                street2: easypostAddress.street2 || '',
-                city: easypostAddress.city || addressToValidate.city,
-                state: easypostAddress.state || addressToValidate.state,
-                postal_code: easypostAddress.zip || addressToValidate.zip,
-                full_address: '',
-              };
-              
-              // Build full address string
-              const parts = [suggestion.street];
-              if (suggestion.street2) parts.push(suggestion.street2);
-              if (suggestion.city && suggestion.state) {
-                parts.push(`${suggestion.city}, ${suggestion.state}`);
-              }
-              if (suggestion.postal_code) {
-                parts[parts.length - 1] += ` ${suggestion.postal_code}`;
-              }
-              suggestion.full_address = parts.join(', ');
-              
-              // Only add if we have meaningful data
-              if (suggestion.street && suggestion.city && suggestion.state) {
-                suggestions.push(suggestion);
-              }
-            }
-          } catch (validationError: any) {
-            // EasyPost validation failed - that's okay, we'll still try to provide basic suggestions
-            console.log('EasyPost validation error (expected for partial addresses):', validationError.message);
-          }
-        }
-        
-        // If we have a city and state, try variations of the street address
-        if ((city || parsed.city) && (state || parsed.state) && parsed.number) {
-          const useCity = city || parsed.city || '';
-          const useState = state || parsed.state || '';
-          const useZip = postalCode || parsed.zip || '';
-          
-          // Generate variations with common street types if not already present
-          const streetName = parsed.street || '';
-          const hasStreetType = STREET_TYPES.some(type => 
-            streetName.toLowerCase().endsWith(type.toLowerCase()) ||
-            streetName.toLowerCase().includes(` ${type.toLowerCase()} `) ||
-            streetName.toLowerCase().includes(` ${type.toLowerCase()}`)
-          );
-          
-          if (!hasStreetType && streetName.length > 3) {
-            // Try adding common street types
-            for (const type of STREET_TYPES.slice(0, 3)) { // Limit to St, Ave, Blvd
-              const variation = `${parsed.number} ${streetName} ${type}`;
-              
-              try {
-                const variationAddress = await client.Address.create({
-                  street1: variation,
-                  city: useCity,
-                  state: useState,
-                  zip: useZip,
-                  country: 'US',
-                  verify: ['delivery'],
-                });
-                
-                if (variationAddress.verifications?.delivery?.success && variationAddress.city && variationAddress.state) {
-                  const varSuggestion: AddressSuggestion = {
-                    id: variationAddress.id || `var_${type}_${Date.now()}`,
-                    street: variationAddress.street1 || variation,
-                    street2: variationAddress.street2 || '',
-                    city: variationAddress.city,
-                    state: variationAddress.state,
-                    postal_code: variationAddress.zip || useZip,
-                    full_address: `${variationAddress.street1}, ${variationAddress.city}, ${variationAddress.state} ${variationAddress.zip || useZip}`,
-                  };
-                  
-                  // Check for duplicates
-                  const isDuplicate = suggestions.some(s => 
-                    s.street.toLowerCase() === varSuggestion.street.toLowerCase() &&
-                    s.city.toLowerCase() === varSuggestion.city.toLowerCase()
-                  );
-                  
-                  if (!isDuplicate) {
-                    suggestions.push(varSuggestion);
-                  }
-                }
-              } catch (e) {
-                // Variation didn't validate, skip it
-              }
-              
-              // Limit API calls
-              if (suggestions.length >= 5) break;
-            }
-          }
-        }
-      }
-    } catch (error: any) {
-      console.error('Address suggestions error:', error.message);
-    }
-    
-    // Return top 5 suggestions
-    return suggestions.slice(0, 5);
   },
 
   /**

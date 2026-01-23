@@ -4,6 +4,7 @@
 interface OrderData {
   id: number;
   order_number: string;
+  ordered_at?: string;
   customer_name: string;
   customer_email?: string;
   guest_email?: string;
@@ -23,6 +24,7 @@ interface OrderData {
   order_items?: Array<{
     product?: { name: string };
     quantity: number;
+    price?: number;
     order_item_parts?: Array<{
       product_part?: { name: string };
       color?: { name: string };
@@ -46,15 +48,20 @@ const BASE_STYLES = `
   h1 { color: #fe5100; font-size: 28px; font-weight: bold; margin-bottom: 20px; text-align: center; }
   h2 { color: #333; font-size: 20px; font-weight: bold; margin: 25px 0 15px 0; }
   p { margin: 10px 0; font-size: 16px; line-height: 1.5; }
+  .order-badge { display: inline-block; background-color: #fe5100; color: white; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: bold; margin-bottom: 15px; }
   .highlight-box { background-color: #f5f5f5; border: 2px solid #fe5100; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0; }
   .success-box { background-color: #e8f5e9; border: 2px solid #4caf50; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0; }
   .info-box { background-color: #e3f2fd; border: 2px solid #2196f3; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0; }
   .warning-box { background-color: #fff3e0; border: 2px solid #ff9800; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0; }
+  .message-box { background-color: #f8f9fa; border-left: 4px solid #fe5100; padding: 20px; margin: 20px 0; font-size: 15px; line-height: 1.7; white-space: pre-wrap; }
   .btn { display: inline-block; margin-top: 15px; padding: 12px 25px; background-color: #fe5100; color: white; text-decoration: none; border-radius: 25px; font-weight: bold; }
   .btn:hover { background-color: #e04600; }
   .order-details { border-top: 1px solid #ddd; padding-top: 15px; margin: 20px 0; }
   .item { border-bottom: 1px solid #eee; padding: 12px 0; }
   .item:last-child { border-bottom: none; }
+  .item-name { font-weight: bold; color: #333; font-size: 15px; }
+  .item-parts { margin-top: 5px; font-size: 13px; color: #666; }
+  .tracking-number { font-size: 20px; font-weight: bold; color: #fe5100; letter-spacing: 1px; word-break: break-all; }
   .footer { margin-top: 30px; font-size: 13px; color: #666; text-align: center; border-top: 1px solid #ddd; padding-top: 20px; }
 `;
 
@@ -73,6 +80,10 @@ function formatDate(dateString?: string): string {
   });
 }
 
+function formatCurrency(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
 function formatAddress(order: OrderData): string {
   const addr = order.shipping_address;
   if (!addr) return 'Not provided';
@@ -84,9 +95,17 @@ function formatAddress(order: OrderData): string {
   return parts.join('<br>');
 }
 
+function buildOrderHeader(order: OrderData): string {
+  return `
+    <div style="text-align: center; margin-bottom: 20px;">
+      <span class="order-badge">Order #${order.order_number}</span>
+    </div>
+  `;
+}
+
 function buildItemsHtml(order: OrderData): string {
   if (!order.order_items || order.order_items.length === 0) {
-    return '<p>No items</p>';
+    return '<p style="color: #666; font-style: italic;">No items</p>';
   }
   
   let html = '';
@@ -95,15 +114,18 @@ function buildItemsHtml(order: OrderData): string {
     const quantity = item.quantity || 1;
     
     let partsHtml = '';
-    for (const part of item.order_item_parts || []) {
-      const partName = part.product_part?.name || 'Part';
-      const colorName = part.color?.name || 'Color';
-      partsHtml += `<div style="margin-top: 5px; font-size: 14px; color: #666;">${partName}: ${colorName}</div>`;
+    if (item.order_item_parts && item.order_item_parts.length > 0) {
+      const partsList = item.order_item_parts.map(part => {
+        const partName = part.product_part?.name || 'Part';
+        const colorName = part.color?.name || 'Color';
+        return `${partName}: ${colorName}`;
+      }).join(', ');
+      partsHtml = `<div class="item-parts">${partsList}</div>`;
     }
     
     html += `
       <div class="item">
-        <div style="font-weight: bold; color: #333;">${productName} × ${quantity}</div>
+        <div class="item-name">${productName} × ${quantity}</div>
         ${partsHtml}
       </div>
     `;
@@ -148,14 +170,16 @@ export function generateStatusEmail(status: string, order: OrderData): EmailTemp
     
     // PENDING - Order received
     pending: () => ({
-      subject: `Order Received - ${order.order_number}`,
+      subject: `Order Received #${order.order_number} | TNT MKR`,
       html: wrapHtml(`
+        ${buildOrderHeader(order)}
         <h1>We Got Your Order! ⏳</h1>
         <p style="text-align: center; font-size: 18px;">Thank you for your order, ${order.customer_name}!</p>
         
         <div class="highlight-box">
           <p style="margin: 0 0 10px 0; font-size: 14px; color: #666;">Order Number:</p>
           <div style="font-size: 24px; font-weight: bold; color: #fe5100; letter-spacing: 2px;">${order.order_number}</div>
+          ${order.ordered_at ? `<p style="margin: 10px 0 0 0; font-size: 13px; color: #888;">Placed on ${formatDate(order.ordered_at)}</p>` : ''}
         </div>
         
         <p>We have received your order and it is awaiting payment confirmation. Once your payment is confirmed, we'll begin preparing your custom items right away!</p>
@@ -166,21 +190,23 @@ export function generateStatusEmail(status: string, order: OrderData): EmailTemp
         </div>
         
         <div class="order-details">
-          <p><strong>Shipping to:</strong><br>${order.customer_name}<br>${formatAddress(order)}</p>
+          <p><strong>Customer:</strong> ${order.customer_name}</p>
+          <p><strong>Shipping to:</strong><br>${formatAddress(order)}</p>
         </div>
       `)
     }),
     
     // PAID - Payment confirmed
     paid: () => ({
-      subject: `Payment Confirmed - Order ${order.order_number}`,
+      subject: `Payment Confirmed #${order.order_number} | TNT MKR`,
       html: wrapHtml(`
+        ${buildOrderHeader(order)}
         <h1>Payment Confirmed! 💰</h1>
         <p style="text-align: center; font-size: 18px;">Great news, ${order.customer_name}!</p>
         
         <div class="success-box">
           <p style="margin: 0; font-size: 18px; color: #2e7d32;">✓ Your payment has been received</p>
-          <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">Order ${order.order_number}</p>
+          <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">Order #${order.order_number}</p>
         </div>
         
         <p>Your order is now in our queue and we'll start preparing your custom items soon. You'll receive another update when we begin printing!</p>
@@ -195,6 +221,10 @@ export function generateStatusEmail(status: string, order: OrderData): EmailTemp
         
         <h2>Order Details</h2>
         <div class="order-details">
+          <p><strong>Order Number:</strong> ${order.order_number}</p>
+          <p><strong>Customer:</strong> ${order.customer_name}</p>
+        </div>
+        <div class="order-details">
           ${buildItemsHtml(order)}
         </div>
       `)
@@ -202,14 +232,15 @@ export function generateStatusEmail(status: string, order: OrderData): EmailTemp
     
     // PRINTING - Items being printed
     printing: () => ({
-      subject: `Your Order is Being Printed - ${order.order_number}`,
+      subject: `Now Printing #${order.order_number} | TNT MKR`,
       html: wrapHtml(`
+        ${buildOrderHeader(order)}
         <h1>Printing in Progress! 🖨️</h1>
         <p style="text-align: center; font-size: 18px;">Exciting news, ${order.customer_name}!</p>
         
         <div class="info-box">
           <p style="margin: 0; font-size: 20px; color: #1976d2;">🖨️ Your items are being 3D printed!</p>
-          <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">Order ${order.order_number}</p>
+          <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">Order #${order.order_number}</p>
         </div>
         
         <p>Your custom items are now on our 3D printers! Each piece is being carefully crafted layer by layer with precision and care.</p>
@@ -223,25 +254,30 @@ export function generateStatusEmail(status: string, order: OrderData): EmailTemp
           ${buildItemsHtml(order)}
         </div>
         
+        <div class="order-details">
+          <p><strong>Shipping to:</strong><br>${order.customer_name}<br>${formatAddress(order)}</p>
+        </div>
+        
         <p>We'll send you another update once printing is complete and we move to assembly!</p>
       `)
     }),
     
     // PRINTED - Printing complete
     printed: () => ({
-      subject: `Printing Complete - Order ${order.order_number}`,
+      subject: `Printing Complete #${order.order_number} | TNT MKR`,
       html: wrapHtml(`
+        ${buildOrderHeader(order)}
         <h1>Printing Complete! 📄</h1>
         <p style="text-align: center; font-size: 18px;">Great progress on your order, ${order.customer_name}!</p>
         
         <div class="success-box">
           <p style="margin: 0; font-size: 20px; color: #2e7d32;">✓ All items successfully printed!</p>
-          <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">Order ${order.order_number}</p>
+          <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">Order #${order.order_number}</p>
         </div>
         
         <p>All of your items have finished printing and passed our initial quality inspection. They're now ready to move to our assembly team!</p>
         
-        <h2>What's Happening Now</h2>
+        <h2>Progress Update</h2>
         <div style="background-color: #f9f9f9; padding: 15px; border-radius: 8px; margin: 15px 0;">
           <p style="margin: 5px 0;"><span style="color: #4caf50;">✓</span> 3D Printing - <strong>Complete!</strong></p>
           <p style="margin: 5px 0;"><span style="color: #fe5100;">→</span> Assembly - <strong>Up Next</strong></p>
@@ -258,14 +294,15 @@ export function generateStatusEmail(status: string, order: OrderData): EmailTemp
     
     // ASSEMBLING - Items being assembled
     assembling: () => ({
-      subject: `Your Order is Being Assembled - ${order.order_number}`,
+      subject: `Assembly in Progress #${order.order_number} | TNT MKR`,
       html: wrapHtml(`
+        ${buildOrderHeader(order)}
         <h1>Assembly in Progress! 🔧</h1>
         <p style="text-align: center; font-size: 18px;">Almost there, ${order.customer_name}!</p>
         
         <div class="info-box">
           <p style="margin: 0; font-size: 20px; color: #1976d2;">🔧 Your items are being assembled!</p>
-          <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">Order ${order.order_number}</p>
+          <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">Order #${order.order_number}</p>
         </div>
         
         <p>Our skilled team is now carefully assembling your printed components. Each piece is hand-finished and quality checked to ensure everything is perfect.</p>
@@ -278,20 +315,25 @@ export function generateStatusEmail(status: string, order: OrderData): EmailTemp
           <p style="margin: 5px 0;"><span style="color: #999;">○</span> Shipping</p>
         </div>
         
+        <div class="order-details">
+          <p><strong>Shipping to:</strong><br>${order.customer_name}<br>${formatAddress(order)}</p>
+        </div>
+        
         <p>Once assembly is complete, your order will be carefully packaged and ready to ship!</p>
       `)
     }),
     
     // PACKAGED - Ready to ship
     packaged: () => ({
-      subject: `Your Order is Ready to Ship - ${order.order_number}`,
+      subject: `Ready to Ship #${order.order_number} | TNT MKR`,
       html: wrapHtml(`
+        ${buildOrderHeader(order)}
         <h1>Packaged & Ready! 📦</h1>
         <p style="text-align: center; font-size: 18px;">Great news, ${order.customer_name}!</p>
         
         <div class="success-box">
           <p style="margin: 0; font-size: 20px; color: #2e7d32;">✓ Your order is packaged and ready to ship!</p>
-          <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">Order ${order.order_number}</p>
+          <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">Order #${order.order_number}</p>
         </div>
         
         <p>All of your items have been assembled, inspected, and carefully packaged. Your order is now in our shipping queue and will be on its way very soon!</p>
@@ -319,15 +361,16 @@ export function generateStatusEmail(status: string, order: OrderData): EmailTemp
       const shipDate = formatDate(order.shipped_at) || formatDate(new Date().toISOString());
       
       return {
-        subject: `Your Order Has Shipped! - ${order.order_number}`,
+        subject: `Shipped! #${order.order_number} | TNT MKR`,
         html: wrapHtml(`
+          ${buildOrderHeader(order)}
           <h1>Your Order Has Shipped! 🚚</h1>
           <p style="text-align: center; font-size: 18px;">Great news, ${order.customer_name}!</p>
           
           ${hasTracking ? `
             <div class="highlight-box">
               <p style="margin: 0 0 10px 0; font-size: 14px; color: #666;">Your Tracking Number:</p>
-              <div style="font-size: 24px; font-weight: bold; color: #fe5100; letter-spacing: 2px;">${order.tracking_number}</div>
+              <div class="tracking-number">${order.tracking_number}</div>
               <a href="${trackingUrl}" class="btn" target="_blank">Track Your Package</a>
             </div>
           ` : `
@@ -364,8 +407,9 @@ export function generateStatusEmail(status: string, order: OrderData): EmailTemp
       const trackingUrl = order.tracking_number ? getTrackingUrl(order.tracking_number, order.carrier_service) : '';
       
       return {
-        subject: `Your Package is On Its Way - ${order.order_number}`,
+        subject: `On Its Way! #${order.order_number} | TNT MKR`,
         html: wrapHtml(`
+          ${buildOrderHeader(order)}
           <h1>Your Package is On Its Way! 🛣️</h1>
           <p style="text-align: center; font-size: 18px;">Update on your order, ${order.customer_name}!</p>
           
@@ -377,7 +421,7 @@ export function generateStatusEmail(status: string, order: OrderData): EmailTemp
           ${order.tracking_number ? `
             <div class="highlight-box">
               <p style="margin: 0 0 10px 0; font-size: 14px; color: #666;">Tracking Number:</p>
-              <div style="font-size: 20px; font-weight: bold; color: #fe5100;">${order.tracking_number}</div>
+              <div class="tracking-number">${order.tracking_number}</div>
               <a href="${trackingUrl}" class="btn" target="_blank">Track Your Package</a>
             </div>
           ` : ''}
@@ -403,8 +447,9 @@ export function generateStatusEmail(status: string, order: OrderData): EmailTemp
       const trackingUrl = order.tracking_number ? getTrackingUrl(order.tracking_number, order.carrier_service) : '';
       
       return {
-        subject: `Your Package is Out for Delivery Today! - ${order.order_number}`,
+        subject: `Out for Delivery Today! #${order.order_number} | TNT MKR`,
         html: wrapHtml(`
+          ${buildOrderHeader(order)}
           <h1>Out for Delivery! 🏠</h1>
           <p style="text-align: center; font-size: 18px;">Exciting news, ${order.customer_name}!</p>
           
@@ -416,7 +461,7 @@ export function generateStatusEmail(status: string, order: OrderData): EmailTemp
           ${order.tracking_number ? `
             <div class="highlight-box">
               <p style="margin: 0 0 10px 0; font-size: 14px; color: #666;">Tracking Number:</p>
-              <div style="font-size: 20px; font-weight: bold; color: #fe5100;">${order.tracking_number}</div>
+              <div class="tracking-number">${order.tracking_number}</div>
               <a href="${trackingUrl}" class="btn" target="_blank">Track Your Package</a>
             </div>
           ` : ''}
@@ -436,8 +481,9 @@ export function generateStatusEmail(status: string, order: OrderData): EmailTemp
       const deliveryDate = formatDate(order.delivered_at) || formatDate(new Date().toISOString());
       
       return {
-        subject: `Your Package Has Been Delivered! - ${order.order_number}`,
+        subject: `Delivered! #${order.order_number} | TNT MKR`,
         html: wrapHtml(`
+          ${buildOrderHeader(order)}
           <h1>Package Delivered! ✅</h1>
           <p style="text-align: center; font-size: 18px;">Great news, ${order.customer_name}!</p>
           
@@ -468,14 +514,15 @@ export function generateStatusEmail(status: string, order: OrderData): EmailTemp
     
     // CANCELED - Order canceled
     canceled: () => ({
-      subject: `Order Canceled - ${order.order_number}`,
+      subject: `Order Canceled #${order.order_number} | TNT MKR`,
       html: wrapHtml(`
+        ${buildOrderHeader(order)}
         <h1>Order Canceled ❌</h1>
         <p style="text-align: center; font-size: 18px;">Hello ${order.customer_name},</p>
         
         <div class="warning-box">
           <p style="margin: 0; font-size: 18px; color: #e65100;">Your order has been canceled</p>
-          <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">Order ${order.order_number}</p>
+          <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">Order #${order.order_number}</p>
         </div>
         
         <p>We're sorry to inform you that your order has been canceled. If a payment was made, your refund will be processed according to our refund policy.</p>
@@ -500,14 +547,15 @@ export function generateStatusEmail(status: string, order: OrderData): EmailTemp
     
     // RETURNED - Order returned
     returned: () => ({
-      subject: `Order Return Processed - ${order.order_number}`,
+      subject: `Return Processed #${order.order_number} | TNT MKR`,
       html: wrapHtml(`
+        ${buildOrderHeader(order)}
         <h1>Return Processed ↩️</h1>
         <p style="text-align: center; font-size: 18px;">Hello ${order.customer_name},</p>
         
         <div class="info-box">
           <p style="margin: 0; font-size: 18px; color: #1976d2;">Your return has been processed</p>
-          <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">Order ${order.order_number}</p>
+          <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">Order #${order.order_number}</p>
         </div>
         
         <p>We have received and processed your return. Your refund will be issued according to our return policy and should appear in your account within 5-10 business days.</p>
@@ -578,7 +626,79 @@ export async function sendStatusNotificationEmail(
   }
 }
 
+// Generate custom message email
+export function generateCustomMessageEmail(order: OrderData, message: string, subject?: string): EmailTemplate {
+  const defaultSubject = `Message About Your Order #${order.order_number} | TNT MKR`;
+  
+  const content = `
+    ${buildOrderHeader(order)}
+    <h1>Message About Your Order 💬</h1>
+    <p style="text-align: center; font-size: 18px;">Hello ${order.customer_name},</p>
+    
+    <div class="message-box">${message}</div>
+    
+    <h2>Order Details</h2>
+    <div class="order-details">
+      <p><strong>Order Number:</strong> ${order.order_number}</p>
+      <p><strong>Customer:</strong> ${order.customer_name}</p>
+      ${order.tracking_number ? `<p><strong>Tracking:</strong> ${order.tracking_number} (${order.carrier_service || 'USPS'})</p>` : ''}
+    </div>
+    
+    <h2>Items in This Order</h2>
+    <div class="order-details">
+      ${buildItemsHtml(order)}
+    </div>
+  `;
+
+  return {
+    subject: subject || defaultSubject,
+    html: wrapHtml(content),
+  };
+}
+
+// Send custom message email to customer
+export async function sendCustomMessageEmail(
+  strapi: any,
+  order: OrderData,
+  message: string,
+  subject?: string
+): Promise<{ success: boolean; reason?: string; sentTo?: string; bcc?: string; error?: string }> {
+  const customerEmail = getCustomerEmail(order);
+  const customerServiceEmail = process.env.DEFAULT_REPLY_TO_EMAIL || 'customer-service@tnt-mkr.com';
+  
+  if (!customerEmail) {
+    strapi.log.warn(`[CUSTOM MESSAGE] No email available for order ${order.order_number}`);
+    return { success: false, reason: 'no_email' };
+  }
+  
+  if (!message || message.trim().length === 0) {
+    strapi.log.warn(`[CUSTOM MESSAGE] Empty message for order ${order.order_number}`);
+    return { success: false, reason: 'empty_message' };
+  }
+  
+  const template = generateCustomMessageEmail(order, message, subject);
+  
+  try {
+    await strapi.plugins['email'].services.email.send({
+      to: customerEmail,
+      bcc: customerServiceEmail,
+      from: process.env.DEFAULT_FROM_EMAIL || 'TNT MKR <no-reply@tnt-mkr.com>',
+      replyTo: customerServiceEmail,
+      subject: template.subject,
+      html: template.html,
+    });
+    
+    strapi.log.info(`[CUSTOM MESSAGE] Sent custom message to ${customerEmail} for order ${order.order_number}`);
+    return { success: true, sentTo: customerEmail, bcc: customerServiceEmail };
+  } catch (error: any) {
+    strapi.log.error(`[CUSTOM MESSAGE] Failed to send custom message: ${error.message}`);
+    return { success: false, reason: 'send_failed', error: error.message };
+  }
+}
+
 export default {
   generateStatusEmail,
   sendStatusNotificationEmail,
+  generateCustomMessageEmail,
+  sendCustomMessageEmail,
 };

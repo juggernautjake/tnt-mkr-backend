@@ -13,15 +13,6 @@ export default {
     },
     {
       method: 'POST',
-      path: '/shipping/address-suggestions',
-      handler: 'shipping.getAddressSuggestions',
-      config: {
-        auth: false,
-        policies: [],
-      },
-    },
-    {
-      method: 'POST',
       path: '/shipping/rates',
       handler: 'shipping.getRates',
       config: {
@@ -29,7 +20,6 @@ export default {
         policies: [],
       },
     },
-    
     // Webhook route (no auth - called by EasyPost)
     {
       method: 'POST',
@@ -40,7 +30,6 @@ export default {
         policies: [],
       },
     },
-    
     // Admin routes (require authentication)
     {
       method: 'GET',
@@ -126,6 +115,14 @@ export default {
       method: 'POST',
       path: '/shipping/admin/test-email',
       handler: 'shipping.testEmail',
+      config: {
+        policies: [],
+      },
+    },
+    {
+      method: 'POST',
+      path: '/shipping/admin/orders/:id/send-message',
+      handler: 'shipping.sendCustomMessage',
       config: {
         policies: [],
       },
